@@ -2,7 +2,7 @@
 A voice identification and recognition system.
 
 ## API
-get_sspeakers() -> [(name, id), ...]
+get_speakers() -> [(name, id), ...]
 
 predict(wav) -> [(id, vote_count),, ...]
 
