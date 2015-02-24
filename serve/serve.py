@@ -1,14 +1,17 @@
 #!/usr/bin/python3
 from flask import abort, Flask, request
+import redis
 
 import random
 import base64
 
 SPEAKER_HASH_LENGTH = 16
 
-app = Flask(__name__)
+# Redis Keys for Predominant Data Structures
+USER_IDS_SET = "user:ids"
 
-speakers = dict()
+app = Flask(__name__)
+redis = redis.StrictRedis()
 
 @app.route('/new_speaker', methods=['POST'])
 def new_speaker():
@@ -17,12 +20,14 @@ def new_speaker():
     new_name = request.form['name']
     if len(new_name) == 0:
         abort(412, "\'name\' field cannot be empty.")
-    if not new_name in speakers:
-        rand_bits = random.getrandbits(SPEAKER_HASH_LENGTH)
-        rand_hash = base64.b64encode(bytes(str(rand_bits), 'ascii'))
-        prefix = new_name[:min(4, len(new_name))]
-        speakers[new_name] = "{}:{}".format(prefix, rand_hash.decode('utf-8'))
-    return speakers[new_name]
+
+    rand_bits = random.getrandbits(SPEAKER_HASH_LENGTH)
+    rand_hash = base64.b64encode(bytes(str(rand_bits), 'ascii'))
+    prefix = new_name[:min(4, len(new_name))]
+    new_id = "{}:{}".format(prefix, rand_hash.decode('utf-8'))
+    redis.sadd(USER_IDS_SET, new_id)
+    redis.set(new_id, new_name)
+    return new_id
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
