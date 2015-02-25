@@ -2,8 +2,8 @@
 from flask import abort, Flask, request
 import redis
 
-import random
-import base64
+import random, base64, json
+from functools import reduce
 
 SPEAKER_HASH_LENGTH = 16
 
@@ -28,6 +28,13 @@ def new_speaker():
     redis.sadd(USER_IDS_SET, new_id)
     redis.set(new_id, new_name)
     return new_id
+
+@app.route('/get_speakers', methods=['GET'])
+def get_speakers():
+    user_ids = redis.smembers(USER_IDS_SET)
+    pipe = reduce(lambda x, y: x.get(y), user_ids, redis.pipeline())
+    user_name_ids = map(lambda x: {"name":x[0].decode('utf-8'), "id":x[1].decode('utf-8')}, zip(pipe.execute(), user_ids))
+    return json.dumps(list(user_name_ids))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
