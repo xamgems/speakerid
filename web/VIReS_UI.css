@@ -1,0 +1,11 @@
+canvas {
+	width:850px;
+	height:650px;
+}
+
+#file {
+	position:fixed;
+	top:5px;
+	right:5px;
+
+}
