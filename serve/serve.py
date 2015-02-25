@@ -36,5 +36,13 @@ def get_speakers():
     user_name_ids = map(lambda x: {"name":x[0].decode('utf-8'), "id":x[1].decode('utf-8')}, zip(pipe.execute(), user_ids))
     return json.dumps(list(user_name_ids))
 
+@app.route('/learn_speaker', methods=['POST'])
+def learn_speaker():
+    request.files['file'].save('temp_trasferred')
+    in_file = open('temp_trasferred')
+    print("Content of in_files")
+    print(in_file.readlines())
+    return str(request.files)
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
