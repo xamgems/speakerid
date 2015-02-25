@@ -2,24 +2,23 @@
 from flask import abort, Flask, request
 import redis
 
+import wave, predict
+import scipy.io.wavfile as wav
+
 import random, base64, json
 from functools import reduce
 
 SPEAKER_HASH_LENGTH = 16
 
 # Redis Keys for Predominant Data Structures
-USER_IDS_SET = "user:ids"
+USER_IDS_SET = "user_ids"
 
 app = Flask(__name__)
 redis = redis.StrictRedis()
 
 @app.route('/new_speaker', methods=['POST'])
 def new_speaker():
-    if not 'name' in request.form:
-        abort(412, "\'name\' field required.")
-    new_name = request.form['name']
-    if len(new_name) == 0:
-        abort(412, "\'name\' field cannot be empty.")
+    check_post_param('name')
 
     rand_bits = random.getrandbits(SPEAKER_HASH_LENGTH)
     rand_hash = base64.b64encode(bytes(str(rand_bits), 'ascii'))
@@ -38,11 +37,20 @@ def get_speakers():
 
 @app.route('/learn_speaker', methods=['POST'])
 def learn_speaker():
-    request.files['file'].save('temp_trasferred')
-    in_file = open('temp_trasferred')
-    print("Content of in_files")
-    print(in_file.readlines())
+    check_post_param('id')
+
+    request.files['wav_sample'].save('temp.wav')
+    wav_info = wave.open('temp.wav', 'r')
+    data, rate = wav.read('temp.wav', 'r')
+    predict.play(wav_info, data, rate)
     return str(request.files)
+
+def check_post_param(key):
+    if not key in request.form:
+        abort(412, "\'{}\' field required.".format(key))
+    new_name = request.form['name']
+    if len(new_name) == 0:
+        abort(412, "\'{}\' field cannot be empty.".format(key))
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
