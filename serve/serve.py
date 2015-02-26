@@ -2,8 +2,7 @@
 from flask import abort, Flask, request
 import redis
 
-import wave, predict
-import scipy.io.wavfile as wav
+import predict
 
 import random, base64, pickle, json
 from functools import reduce
@@ -15,7 +14,6 @@ USER_IDS_SET = "user_ids"
 
 # user:id name string training binary
 PREFIX_USER = "user:"
-
 USER_NAME = "name"
 USER_TRAINING = "training_data"
 
@@ -46,12 +44,10 @@ def get_speakers():
 @app.route('/learn_speaker', methods=['POST'])
 def learn_speaker():
     check_post_param('id')
-
+    user_id = request.form['id']
     request.files['wav_sample'].save('temp.wav')
-    wav_info = wave.open('temp.wav', 'r')
-    data, rate = wav.read('temp.wav', 'r')
-    predict.play(wav_info, data, rate)
-    return str(request.files)
+    gmm = predict.learn('temp.wav')
+    return str(gmm)
 
 def check_post_param(key):
     if not key in request.form:
