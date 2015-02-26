@@ -4,6 +4,7 @@ var leftchannel = [];
 var rightchannel = [];
 var recordButt;
 var stopButt;
+var sendButt;
 var getSpeakers;
 var submitSpeaker;
 var mediaRecorder;
@@ -20,8 +21,12 @@ window.onload = function() {
   recordButt = document.getElementById("record");
   stopButt = document.getElementById("stop");
 
+  sendButt = document.getElementById("send");
+  sendButt.onclick = sendWav;
+
   getSpeakers = document.getElementById("speaker");
   getSpeakers.onclick = getAllSpeakers;
+
 
   submitSpeaker = document.getElementById("new");  
   submitSpeaker.onclick = newSpeaker;
@@ -100,15 +105,24 @@ function stopRecord() {
   console.log("recorder stopped");
 }
 
+function sendWav() {
+  // This method invokes the ondataavaible. which
+  // is mediaDataReady
+  mediaRecorder.requestData();
+}
+
 function mediaDataReady(e) {
   console.log("data available..");
   toSend.push(e.data);
   var blob = new Blob(toSend, { 'type' : 'audio/wav; codecs=opus'});
   var audio = document.querySelector('audio');
-  audio.src = window.URL.createObjectURL(blob);
+  var url = window.URL.createObjectURL(blob);
+  audio.src = url;
+  console.log(url);
   var params = new FormData();
   params.append("request", "predict");
-  params.append("wav", blob);
+  params.append("size", blob.size);
+  params.append("wav", url);
   post(params, predictReturn);
 }
 
@@ -132,6 +146,9 @@ function getSpeakersReturn() {
   if (this.status == 200) {
     console.log("    Successfully gotten all the speakers");
     // Handle this.responseText
+    var p = document.createElement("p");
+    p.innerHTML = this.responseText;
+    document.getElementById("list").appendChild(p);
   } else {
     console.log("    Failed to get all speakers from server. Error: " + this.status);
   }
@@ -145,7 +162,7 @@ function newSpeaker() {
   }
   console.log("Submitting a new speaker \"" + name + "\"..");
   var params = new FormData();
-  params.append("request", "new_speaker");
+  params.append("request", "new");
   document.getElementById("newUser").disabled = true;
   params.append("name", name);
   post(params, newSpeakerReturn);
@@ -153,7 +170,8 @@ function newSpeaker() {
 
 function newSpeakerReturn() {
   if (this.status == 200) {
-    var id = Number(this.responseText);
+    var id = this.responseText;
+    console.log(this.responseText);
     speakers.id = document.getElementById("newUser").value;
     document.getElementById("newUser").disabled = false;
     console.log("    Successfully submitted a new speaker.");

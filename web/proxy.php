@@ -1,7 +1,7 @@
 <?php
 # This HOST global constant should also include port number if there is one.
-define('HOST', ''); 
-
+#define('HOST', 'http://128.208.7.52'); 
+$HOST = "128.208.7.52";
 ini_set('reporting_errors', 1);
 error_reporting(E_ALL);
 
@@ -11,21 +11,37 @@ if ($_SERVER["REQUEST_METHOD"] != "POST") {
 
 if (isset($_POST["request"])) {
   $r = $_POST["request"];
-#$dest = "";
   if (strcmp($r, "get") == 0) {
     $dest = $HOST . "/get_speakers";
     $req = curl_init($dest);
+    curl_setopt($req, CURLOPT_HTTPGET, true);
+  
   } else if (strcmp($r, "predict") == 0) {
     $dest = $HOST . "/predict";
+    $local = "/test1.wav";
+    $input = fopen('$_POST["wav"]', 'r');
+    file_put_content($local, file_get_content($_POST["wav"]));
+    #$input = fopen('VIReS.html', 'r');  
+    $header = array('Content-Type: multipart/form-data');
     $req = curl_init($dest);
-    curl_setopt($req, CURLOPT_POSTFIELDS, array('wav' => $_POST["wav"]));
+    curl_setopt($req, CURLOPT_POST, true);
+    curl_setopt($req, CURLOPT_HTTPHEADER, $header);
+    curl_setopt($req, CURLOPT_BINARYTRANSFER, true);
+    curl_setopt($req, CURLOPT_INFILESIZE, $_POST["size"]);
+    curl_setopt($req, CURLOPT_INFILE, $_POST['wav']);
+    curl_setopt($req, CURLOPT_POSTFIELDS, array(
+                                                'file' => "@" . $local));
+ 
   } else if (strcmp($r, "new") == 0) {
     $dest = $HOST . "/new_speaker";
     $req = curl_init($dest);
-    curl_setopt($req, CURLOPT_POSTFIELDS, array('wav' => $_POST["name"]));
+    curl_setopt($req, CURLOPT_POST, true);
+    curl_setopt($req, CURLOPT_POSTFIELDS, array('name' => $_POST["name"]));
+  
   } else if (strcmp($r, "learn") == 0) {
     $dest = $HOST . "/learn_speaker";
     $req = curl_init($dest);
+    curl_setopt($req, CURLOPT_POST, true);
     curl_setopt($req, CURLOPT_POSTFIELDS, array('wav' => $_POST["wav"], 'id' => $_POST["id"]));
 
   }
@@ -35,11 +51,7 @@ if (isset($_POST["request"])) {
   curl_close($req);
   
 }
-?>
-
-<?= $returnVal ?>
-
-<?php
+?><?= $returnVal ?><?php
 
 function http_error($code, $message = "") {
     $code = (int) $code;
