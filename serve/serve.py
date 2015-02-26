@@ -44,10 +44,15 @@ def get_speakers():
 
 @app.route('/predict', methods=['POST'])
 def predict_speaker():
-    print("Got a new wave file to predict")
     request.files['wav_sample'].save('record.wav')
-    predict.play('record.wav')
-    return "200 Sure"
+
+    user_ids = redis.smembers(USER_IDS_SET)
+    pipe = reduce(lambda p, next_id: p.hget(hm_data(next_id.decode('utf-8')), USER_MODEL), user_ids, redis.pipeline())
+    models_binary = pipe.execute()
+    models = list(map(lambda x: pickle.loads(x), models_binary))
+
+    probs = predict.speaker_distribution('record.wav', user_ids, models)
+    return str(probs)
 
 @app.route('/learn_speaker', methods=['POST'])
 def learn_speaker():

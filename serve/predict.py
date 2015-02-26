@@ -30,6 +30,38 @@ def play(wav_filename):
     astream.stop_stream()
     astream.close()
 
+def speaker_distribution(wav_filename, speakers, models):
+    rate, signal = wav.read(wav_filename, 'r')
+    feats = mfcc(signal, rate, winstep=0.1)
+    counts = [0] * len(speakers)
+    for f in feats:
+        lls = [likelihood(f, m) for m in models]
+        probs = [ll/sum(lls) for ll in lls]
+        max_probs = max(enumerate(probs), key=lambda x: x[1])
+        counts[max_probs[0]] += 1
+
+    probs = [(speaker.decode('utf-8'), c/sum(counts)) for (speaker, c) in zip(speakers, counts)]
+    return probs
+
+def likelihood(x, model):
+    priors = model.weights_
+    mus = model.means_
+    sigmas = model.covars_
+    return sum([p * mv_gaussian_pdf(x, m, s) for p, m, s in zip(priors, mus, sigmas)])
+
+# Computes the multivariate gaussian of an array-like x. sigma is a 1D array which represents the
+# diagonals of a matrix.
+def mv_gaussian_pdf(x, mu, sigma):
+    size = len(x)
+    det = reduce(lambda x, y: x * y, sigma)
+    sigma = np.diag(sigma)
+
+    norm_const = 1.0 / (pow((2*np.pi),float(size)/2) * pow(det,1.0/2))
+    x_mu = np.matrix(x - mu)
+    inv = np.linalg.inv(sigma)
+    exp_const = np.power(np.e, -0.5 * (x_mu * inv * x_mu.T))
+    return norm_const * exp_const
+
 def grouper(iterable, n, fillvalue=None):
     args = [iter(iterable)] * n
     return zip_longest(fillvalue=fillvalue, *args)
