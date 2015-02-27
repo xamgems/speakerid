@@ -16,6 +16,7 @@ USER_IDS_SET = "user_ids"
 PREFIX_USER = "user:"
 USER_NAME = "name"
 USER_TRAINING = "training_data"
+USER_MODEL = "model_data"
 
 app = Flask(__name__)
 redis = redis.StrictRedis()
@@ -30,24 +31,41 @@ def new_speaker():
     prefix = new_name[:min(4, len(new_name))]
     new_id = "{}:{}".format(prefix, rand_hash.decode('utf-8'))
     redis.sadd(USER_IDS_SET, new_id)
-    redis.hmset(PREFIX_USER + new_id, {USER_NAME: new_name, USER_TRAINING: pickle.dumps(list())})
+    redis.hmset(hm_data(new_id), {USER_NAME: new_name})
     return new_id
 
 @app.route('/get_speakers', methods=['GET'])
 def get_speakers():
     user_ids = redis.smembers(USER_IDS_SET)
 
-    pipe = reduce(lambda p, next_id: p.hget(PREFIX_USER + next_id.decode('utf-8'), USER_NAME), user_ids, redis.pipeline())
+    pipe = reduce(lambda p, next_id: p.hget(hm_data(next_id.decode('utf-8')), USER_NAME), user_ids, redis.pipeline())
     user_name_ids = map(lambda x: {"name":x[0].decode('utf-8'), "id":x[1].decode('utf-8')}, zip(pipe.execute(), user_ids))
     return json.dumps(list(user_name_ids))
+
+@app.route('/predict', methods=['POST'])
+def predict_speaker():
+    request.files['wav_sample'].save('record.wav')
+
+    user_ids = redis.smembers(USER_IDS_SET)
+    pipe = reduce(lambda p, next_id: p.hget(hm_data(next_id.decode('utf-8')), USER_MODEL), user_ids, redis.pipeline())
+    models_binary = pipe.execute()
+    models = list(map(lambda x: pickle.loads(x), models_binary))
+
+    probs = predict.speaker_distribution('record.wav', user_ids, models)
+    return str(probs)
 
 @app.route('/learn_speaker', methods=['POST'])
 def learn_speaker():
     check_post_param('id')
     user_id = request.form['id']
     request.files['wav_sample'].save('temp.wav')
-    gmm = predict.learn('temp.wav')
-    return str(gmm)
+    user_training = None
+    if redis.hexists(hm_data(user_id), USER_TRAINING):
+        user_training = pickle.loads(redis.hget(hm_data(user_id), USER_TRAINING))
+
+    gmm, mfccs = predict.learn('temp.wav', user_training)
+    redis.hmset(hm_data(user_id), {USER_TRAINING: pickle.dumps(mfccs), USER_MODEL: pickle.dumps(gmm)})
+    return str(len(mfccs))
 
 def check_post_param(key):
     if not key in request.form:
@@ -55,6 +73,9 @@ def check_post_param(key):
     value = request.form[key]
     if len(value) == 0:
         abort(412, "\'{}\' field cannot be empty.".format(key))
+
+def hm_data(user_id):
+    return PREFIX_USER + user_id
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=80, debug=True)
