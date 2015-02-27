@@ -18,19 +18,17 @@ if (isset($_POST["request"])) {
   
   } else if (strcmp($r, "predict") == 0) {
     $dest = $HOST . "/predict";
-    $local = "/test1.wav";
-    $input = fopen('$_POST["wav"]', 'r');
-    file_put_content($local, file_get_content($_POST["wav"]));
+    #$local = "/test1.wav";
+    #file_put_content($local, file_get_content($_POST["wav"]));
     #$input = fopen('VIReS.html', 'r');  
     $header = array('Content-Type: multipart/form-data');
     $req = curl_init($dest);
     curl_setopt($req, CURLOPT_POST, true);
     curl_setopt($req, CURLOPT_HTTPHEADER, $header);
     curl_setopt($req, CURLOPT_BINARYTRANSFER, true);
-    curl_setopt($req, CURLOPT_INFILESIZE, $_POST["size"]);
-    curl_setopt($req, CURLOPT_INFILE, $_POST['wav']);
-    curl_setopt($req, CURLOPT_POSTFIELDS, array(
-                                                'file' => "@" . $local));
+    #curl_setopt($req, CURLOPT_INFILESIZE, $_POST["size"]);
+    #curl_setopt($req, CURLOPT_INFILE, $_POST['wav']);
+    curl_setopt($req, CURLOPT_POSTFIELDS, array('wav_sample' => "@" . $_POST["wav"]));
  
   } else if (strcmp($r, "new") == 0) {
     $dest = $HOST . "/new_speaker";

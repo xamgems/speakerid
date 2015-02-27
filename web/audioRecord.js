@@ -9,6 +9,8 @@ var getSpeakers;
 var submitSpeaker;
 var mediaRecorder;
 var toSend = [];
+var counter = 0;
+var fileName = "sound";
 
 window.onload = function() {
   if (!navigator.getUserMedia)
@@ -118,11 +120,19 @@ function mediaDataReady(e) {
   var audio = document.querySelector('audio');
   var url = window.URL.createObjectURL(blob);
   audio.src = url;
-  console.log(url);
+  
+  var file = fileName + counter;
+  console.log(file);  
+  counter++;
+  var link = document.createElement("a");
+  link.download = file;
+  link.href = url;
+  link.click();
+
   var params = new FormData();
   params.append("request", "predict");
   params.append("size", blob.size);
-  params.append("wav", url);
+  params.append("wav", file);
   post(params, predictReturn);
 }
 
