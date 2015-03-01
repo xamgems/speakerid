@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html>
 	<head>
-		<script type="text/javascript" src="audioRecord.js"></script>
-
+        <script type="text/javascript" src="recorder.js"></script>
+        <script type="text/javascript" src="recorderWorker.js"></script>
+        <script type="text/javascript" src="audioRecord.js"></script>
 	
 		<link rel="stylesheet" type="text/css" href="VIReS_UI.css" />
 	</head>
@@ -18,7 +19,7 @@
     <input type="text" id="newUser" name="new" />
 	  <button id="new">Submit New Speaker</button>
     <br />
-    <input type="checkbox" value="1" name="learn" />Learn
+    <input type="checkbox" value="1" name="learn" id="learning"/>Learn
     <br />
     <div id="list"></div>
   </body>

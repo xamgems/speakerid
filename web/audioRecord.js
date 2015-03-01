@@ -11,6 +11,7 @@ var mediaRecorder;
 var toSend = [];
 var counter = 0;
 var fileName = "sound";
+var recorder;
 
 window.onload = function() {
   if (!navigator.getUserMedia)
@@ -66,6 +67,7 @@ function userMediaSuccess(e){
 
   // creates an audio node from the microphone incoming stream
   audioInput = context.createMediaStreamSource(e);
+  recorder = new Recorder(audioInput);
 
   // connect the stream to the gain node
   audioInput.connect(volume);
@@ -98,13 +100,78 @@ function userMediaSuccess(e){
 }
 
 function startRecord() {
-  mediaRecorder.start();
+  //mediaRecorder.start();
+  recorder.record();
   console.log("recorder started");
 }
 
 function stopRecord() {
-  mediaRecorder.stop();
+  //mediaRecorder.stop();
+  recorder.stop();
   console.log("recorder stopped");
+  recorder.exportWAV(exportSound);
+}
+
+function exportSound(s) {
+  //var url = window.URL.createObjectURL(s);
+  if (!document.getElementById("learning").checked) {
+    var file = fileName + counter + ".wav";
+    counter++;
+    var params = new FormData();
+    params.append("request", "predict");
+    params.append("name", file);
+    params.append("wav", s);
+    post(params, predictReturn);
+  } else {
+    var id = document.getElementById("newUser").value;
+    var file = fileName + counter + ".wav";
+    counter++;
+    console.log(file);
+    var params = new FormData();
+    params.append("request", "learn");
+    params.append("id", id);
+    params.append("name", file);
+    params.append("wav", s);
+    post(params, predictReturn);
+
+  }
+  /*
+  //var file = fileName + counter + ".wav";
+  //console.log(file);  
+  //counter++;
+  //var link = document.createElement("a");
+  //link.download = file;
+  //console.log(url);
+  //link.href = url;
+  //var event = document.createEvent('Event');
+  //event.initEvent('click', true, true);
+  //link.dispatchEvent(event);
+  //(window.URL || window.webkitURL).revokeObjectURL(link.href);
+  var reader = new FileReader();
+  reader.readAsDataURL(s);
+  reader.onload = function (event) {
+        var file = fileName + counter + ".wav";
+        console.log(file);
+        counter++;
+
+        var audio = document.querySelector('audio');
+        audio.src = event.target.result;
+
+        var save = document.createElement('a');
+        save.href = event.target.result;
+        save.target = '_blank';
+        save.download = file;
+        document.body.appendChild(save);
+        save.click(); 
+        
+        var event = document.createEvent('Event');
+        event.initEvent('click', true, true);
+        save.dispatchEvent(event);
+        (window.URL || window.webkitURL).revokeObjectURL(save.href);
+    
+    };
+    */
+
 }
 
 function sendWav() {
@@ -121,13 +188,18 @@ function mediaDataReady(e) {
   var url = window.URL.createObjectURL(blob);
   audio.src = url;
   
-  var file = fileName + counter;
+  var file = fileName + counter + ".wav";
   console.log(file);  
   counter++;
   var link = document.createElement("a");
   link.download = file;
+  console.log(url);
   link.href = url;
-  link.click();
+
+  var event = document.createEvent('Event');
+  event.initEvent('click', true, true);
+  link.dispatchEvent(event);
+  (window.URL || window.webkitURL).revokeObjectURL(link.href);
 
   var params = new FormData();
   params.append("request", "predict");
@@ -138,8 +210,11 @@ function mediaDataReady(e) {
 
 function predictReturn() {
   if (this.status == 200) {
-    console.log("    Successfully getten the prediction result");
-    // Handle this.responseText.
+    console.log("    Successfully gotten the prediction result");
+    var p = document.createElement("p");
+    p.innerHTML = this.responseText;
+    document.body.appendChild(p);
+    //console.log(this.responseText);
   } else {
     console.log("    Predict returns with error: " + this.status);
   }
