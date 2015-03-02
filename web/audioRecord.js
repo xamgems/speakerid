@@ -103,6 +103,14 @@ function startRecord() {
   //mediaRecorder.start();
   recorder.record();
   console.log("recorder started");
+
+	window.setInterval(function () {
+	   recorder.stop();
+       console.log("recorder stopped");
+       recorder.exportWAV(exportSound);
+       recorder.clear();
+	   recorder.record();
+	}, 500);
 }
 
 function stopRecord() {
@@ -110,6 +118,7 @@ function stopRecord() {
   recorder.stop();
   console.log("recorder stopped");
   recorder.exportWAV(exportSound);
+  recorder.clear();
 }
 
 function exportSound(s) {
@@ -206,6 +215,11 @@ function mediaDataReady(e) {
 function predictReturn() {
   if (this.status == 200) {
     console.log("    Successfully gotten the prediction result");
+	var oldPredictions = document.getElementsByTagName("p");
+	for (i = 0; i < oldPredictions.length; i++) {
+	  document.body.removeChild(oldPredictions[i]);
+	}
+	
     var p = document.createElement("p");
     p.innerHTML = this.responseText;
     document.body.appendChild(p);
