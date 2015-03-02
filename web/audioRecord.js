@@ -118,22 +118,17 @@ function exportSound(s) {
     var file = fileName + counter + ".wav";
     counter++;
     var params = new FormData();
-    params.append("request", "predict");
-    params.append("name", file);
-    params.append("wav", s);
-    post(params, predictReturn);
+    params.append("wav_sample", s);
+    send("POST", "predict", params, predictReturn);
   } else {
     var id = document.getElementById("newUser").value;
     var file = fileName + counter + ".wav";
     counter++;
     console.log(file);
     var params = new FormData();
-    params.append("request", "learn");
     params.append("id", id);
-    params.append("name", file);
-    params.append("wav", s);
-    post(params, predictReturn);
-
+    params.append("wav_sample", s);
+    send("POST", "learn_speaker", params, predictReturn);
   }
   /*
   //var file = fileName + counter + ".wav";
@@ -205,7 +200,7 @@ function mediaDataReady(e) {
   params.append("request", "predict");
   params.append("size", blob.size);
   params.append("wav", file);
-  post(params, predictReturn);
+  send(params, predictReturn);
 }
 
 function predictReturn() {
@@ -223,8 +218,7 @@ function predictReturn() {
 function getAllSpeakers() {
   console.log("Getting all speakers..");
   var params = new FormData();
-  params.append("request", "get");
-  post(params, getSpeakersReturn);
+  send("GET", "get_speakers", params, getSpeakersReturn);
 }
 
 function getSpeakersReturn() {
@@ -247,10 +241,9 @@ function newSpeaker() {
   }
   console.log("Submitting a new speaker \"" + name + "\"..");
   var params = new FormData();
-  params.append("request", "new");
   document.getElementById("newUser").disabled = true;
   params.append("name", name);
-  post(params, newSpeakerReturn);
+  send("POST", "new_speaker", params, newSpeakerReturn);
 }
 
 function newSpeakerReturn() {
@@ -265,9 +258,9 @@ function newSpeakerReturn() {
   }
 }
 
-function post(params, callback) {
+function send(method, endpoint, params, callback) {
   var ajax = new XMLHttpRequest();
   ajax.onload = callback;
-  ajax.open("POST", "proxy.php", true);
+  ajax.open(method, "http://localhost/" + endpoint, true);
   ajax.send(params);
 }

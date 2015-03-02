@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 from flask import abort, Flask, request
+from crossdomain import crossdomain
 import redis
 
 import predict
@@ -22,6 +23,7 @@ app = Flask(__name__)
 redis = redis.StrictRedis()
 
 @app.route('/new_speaker', methods=['POST'])
+@crossdomain(origin='*')
 def new_speaker():
     check_post_param('name')
     new_name = request.form['name']
@@ -35,6 +37,7 @@ def new_speaker():
     return new_id
 
 @app.route('/get_speakers', methods=['GET'])
+@crossdomain(origin='*')
 def get_speakers():
     user_ids = redis.smembers(USER_IDS_SET)
 
@@ -43,6 +46,7 @@ def get_speakers():
     return json.dumps(list(user_name_ids))
 
 @app.route('/predict', methods=['POST'])
+@crossdomain(origin='*')
 def predict_speaker():
     request.files['wav_sample'].save('record.wav')
 
@@ -55,6 +59,7 @@ def predict_speaker():
     return str(probs)
 
 @app.route('/learn_speaker', methods=['POST'])
+@crossdomain(origin='*')
 def learn_speaker():
     check_post_param('id')
     user_id = request.form['id']
