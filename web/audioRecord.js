@@ -11,6 +11,7 @@ var mediaRecorder;
 var toSend = [];
 var counter = 0;
 var fileName = "sound";
+var predictionInterval;
 var recorder;
 
 window.onload = function() {
@@ -30,7 +31,6 @@ window.onload = function() {
   getSpeakers = document.getElementById("speaker");
   getSpeakers.onclick = getAllSpeakers;
 
-
   submitSpeaker = document.getElementById("new");  
   submitSpeaker.onclick = newSpeaker;
 
@@ -46,8 +46,6 @@ window.onload = function() {
   }
 }
 
-
-
 function userMediaSuccess(e){
   // Create a audio output tag for debugging purpose.
   //var audio = document.querySelector('audio');
@@ -56,7 +54,6 @@ function userMediaSuccess(e){
   // creates the audio context
   var audioContext = window.AudioContext || window.webkitAudioContext;
   context = new audioContext();
-
 
   mediaRecorder = new MediaRecorder(e);
   recordButt.onclick = startRecord;
@@ -100,82 +97,73 @@ function userMediaSuccess(e){
 }
 
 function startRecord() {
-  //mediaRecorder.start();
+  if (document.getElementById("learning").checked) {
+	  startLearnRecord();
+  } else {
+	  startPredictRecord();
+  }
+}
+
+function stopRecord() {
+  if (document.getElementById("learning").checked) {
+    stopLearnRecord();
+  } else {
+    stopPredictRecord();
+  }
+}
+
+function startPredictRecord() {
   recorder.record();
   console.log("recorder started");
 
-	window.setInterval(function () {
+  predictionInterval = window.setInterval(function () {
 	   recorder.stop();
-       console.log("recorder stopped");
-       recorder.exportWAV(exportSound);
+       recorder.exportWAV(exportPredictionData);
        recorder.clear();
 	   recorder.record();
 	}, 500);
 }
 
-function stopRecord() {
-  //mediaRecorder.stop();
+function stopPredictRecord() {
+  if (typeof predictionInterval !== 'undefined') {
+    window.clearInterval(predictionInterval);
+	delete predictionInterval;
+  }
   recorder.stop();
   console.log("recorder stopped");
-  recorder.exportWAV(exportSound);
+  recorder.exportWAV(exportPredictionData);
   recorder.clear();
 }
 
-function exportSound(s) {
-  //var url = window.URL.createObjectURL(s);
-  if (!document.getElementById("learning").checked) {
-    var file = fileName + counter + ".wav";
-    counter++;
-    var params = new FormData();
-    params.append("wav_sample", s);
-    send("POST", "predict", params, predictReturn);
-  } else {
-    var id = document.getElementById("newUser").value;
-    var file = fileName + counter + ".wav";
-    counter++;
-    console.log(file);
-    var params = new FormData();
-    params.append("id", id);
-    params.append("wav_sample", s);
-    send("POST", "learn_speaker", params, predictReturn);
-  }
-  /*
-  //var file = fileName + counter + ".wav";
-  //console.log(file);  
-  //counter++;
-  //var link = document.createElement("a");
-  //link.download = file;
-  //console.log(url);
-  //link.href = url;
-  //var event = document.createEvent('Event');
-  //event.initEvent('click', true, true);
-  //link.dispatchEvent(event);
-  //(window.URL || window.webkitURL).revokeObjectURL(link.href);
-  var reader = new FileReader();
-  reader.readAsDataURL(s);
-  reader.onload = function (event) {
-        var file = fileName + counter + ".wav";
-        console.log(file);
-        counter++;
+function startLearnRecord() {
+  recorder.record();
+  console.log("recorder started");
+}
 
-        var audio = document.querySelector('audio');
-        audio.src = event.target.result;
+function stopLearnRecord() {
+  recorder.stop();
+  console.log("recorder stopped");
+  recorder.exportWAV(exportLearnData);
+  recorder.clear();
+}
 
-        var save = document.createElement('a');
-        save.href = event.target.result;
-        save.target = '_blank';
-        save.download = file;
-        document.body.appendChild(save);
-        save.click(); 
-        
-        var event = document.createEvent('Event');
-        event.initEvent('click', true, true);
-        save.dispatchEvent(event);
-        (window.URL || window.webkitURL).revokeObjectURL(save.href);
-    
-    };
-    */
+function exportPredictionData(s) {
+  var file = fileName + counter + ".wav";
+  counter++;
+  var params = new FormData();
+  params.append("wav_sample", s);
+  send("POST", "predict", params, predictReturn);
+}
 
+function exportLearnData(s) {
+  var id = document.getElementById("newUser").value;
+  var file = fileName + counter + ".wav";
+  counter++;
+  console.log(file);
+  var params = new FormData();
+  params.append("id", id);
+  params.append("wav_sample", s);
+  send("POST", "learn_speaker", params, learnReturn);
 }
 
 function sendWav() {
@@ -210,6 +198,17 @@ function mediaDataReady(e) {
   params.append("size", blob.size);
   params.append("wav", file);
   send(params, predictReturn);
+}
+
+function learnReturn() {
+  if (this.status == 200) {
+    console.log("    Successfully learned from voice data");
+    var p = document.createElement("p");
+    p.innerHTML = this.responseText;
+    document.body.appendChild(p);
+  } else {
+    console.log("    Learn returns with error: " + this.status);
+  }
 }
 
 function predictReturn() {
