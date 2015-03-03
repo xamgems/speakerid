@@ -75,7 +75,9 @@ function userMediaSuccess(e){
   audioInput = context.createMediaStreamSource(e);
   recorder = new Recorder(audioInput);
   analyzer = context.createAnalyser();
-  
+  analyzer.smoothingTimeConstant = 0.3;
+  analyzer.fftSize = 512;
+ 
   canvas = document.getElementById("wave_render");
   draw_ctx = canvas.getContext("2d");
 
@@ -117,17 +119,27 @@ function frameLooper() {
   fbc_arr = new Uint8Array(analyzer.frequencyBinCount);
   analyzer.getByteFrequencyData(fbc_arr);
   draw_ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  var gradient = draw_ctx.createLinearGradient(0,0,0,canvas.height);
+  gradient.addColorStop(1, '#000000');
+  gradient.addColorStop(0.75, '#000000');
+  gradient.addColorStop(0.5, '#000088');
+  gradient.addColorStop(0.25, '#0000ff');
+  gradient.addColorStop(0, '#0000ff');
+  
   for (var i = 0; i < analyzer.frequencyBinCount; i++) {
     var value = fbc_arr[i];
-    var percent = value / 256;
+    var percent = value / 512;
     var height = canvas.height * percent;
     var offset = canvas.height - height - 1;
     var barWidth = canvas.width/analyzer.frequencyBinCount;
     var hue = i/analyzer.frequencyBinCount * 360;
-    draw_ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
-    draw_ctx.fillRect(i * barWidth, offset, barWidth, height);
+    //draw_ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+    draw_ctx.fillStyle = gradient;
+    //draw_ctx.fillRect((i * barWidth) + 1, offset, barWidth, height);
+    draw_ctx.fillRect(i * 3, offset, barWidth, height);
     draw_ctx.fillStyle = 'black';
-    draw_ctx.fillRect(i * barWidth, offset, 1, 1);
+    draw_ctx.fillRect(i * 3, offset, 1, 1);
   }
 }
 

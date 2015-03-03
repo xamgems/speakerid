@@ -17,6 +17,8 @@ body {
 }
 
 #header {
+  padding-left: 15px;
+  padding-bottom: 15px;
   overflow:hidden;
   background-color:white;
 }
