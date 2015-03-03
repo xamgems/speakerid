@@ -5,7 +5,7 @@ import redis
 
 import predict
 
-import random, base64, pickle, json
+import random, base64, pickle, json, tempfile, os
 from functools import reduce
 
 SPEAKER_HASH_LENGTH = 16
@@ -48,14 +48,16 @@ def get_speakers():
 @app.route('/predict', methods=['POST'])
 @crossdomain(origin='*')
 def predict_speaker():
-    request.files['wav_sample'].save('record.wav')
+    filename = next(tempfile._get_candidate_names())
+    request.files['wav_sample'].save(filename)
 
     user_ids = redis.smembers(USER_IDS_SET)
     pipe = reduce(lambda p, next_id: p.hget(hm_data(next_id.decode('utf-8')), USER_MODEL), user_ids, redis.pipeline())
     models_binary = pipe.execute()
     models = list(map(lambda x: pickle.loads(x), models_binary))
 
-    probs = predict.speaker_distribution('record.wav', user_ids, models)
+    probs = predict.speaker_distribution(filename, user_ids, models)
+    os.remove(filename)
     return json.dumps(probs)
 
 @app.route('/learn_speaker', methods=['POST'])

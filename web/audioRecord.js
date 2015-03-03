@@ -33,7 +33,7 @@ window.onload = function() {
   sendButt.onclick = sendWav;
 
   getSpeakers = document.getElementById("speaker");
-  getSpeakers.onclick = getAllSpeakers;
+  getSpeakers.onclick = printAllSpeakers;
 
   submitSpeaker = document.getElementById("new");  
   submitSpeaker.onclick = newSpeaker;
@@ -257,10 +257,16 @@ function resolveSpeakerEntry(id) {
 function getAllSpeakers() {
   console.log("Getting all speakers..");
   var params = new FormData();
-  send("GET", "get_speakers", params, getSpeakersReturn);
+  send("GET", "get_speakers", params, updateSpeakersList);
 }
 
-function getSpeakersReturn() {
+function printAllSpeakers() {
+  console.log("Getting all speakers..");
+  var params = new FormData();
+  send("GET", "get_speakers", params, printSpeakersList);
+}
+
+function updateSpeakersList() {
   if (this.status == 200) {
     console.log("    Successfully gotten all the speakers");
     // Handle this.responseText
@@ -271,6 +277,18 @@ function getSpeakersReturn() {
 	for (i = 0; i < speakerList.length; i++) {
 		speakerList[i]['color'] = speakerColors[i]
 	}
+  } else {
+    console.log("    Failed to get all speakers from server. Error: " + this.status);
+  }
+}
+
+function printSpeakersList() {
+  if (this.status == 200) {
+    console.log("    Successfully gotten all the speakers");
+    // Handle this.responseText
+    var p = document.createElement("p");
+    p.innerHTML = this.responseText;
+    document.getElementById("list").appendChild(p);
   } else {
     console.log("    Failed to get all speakers from server. Error: " + this.status);
   }
