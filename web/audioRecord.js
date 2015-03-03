@@ -11,11 +11,15 @@ var mediaRecorder;
 var toSend = [];
 var counter = 0;
 var fileName = "sound";
-var predictionInterval;
 var recorder;
 var analyzer;
 var canvas;
 var draw_ctx;
+
+var predictionInterval;
+var speakerList;
+var speakerColors = ["#2196f3", "#f44336", "#e91e63"];
+var currentColor = "#ffffff";
 
 window.onload = function() {
   if (!navigator.getUserMedia)
@@ -32,7 +36,7 @@ window.onload = function() {
  // sendButt.onclick = sendWav;
 
   getSpeakers = document.getElementById("speaker");
-  getSpeakers.onclick = getAllSpeakers;
+  getSpeakers.onclick = printAllSpeakers;
 
   submitSpeaker = document.getElementById("new");  
   submitSpeaker.onclick = newSpeaker;
@@ -47,6 +51,8 @@ window.onload = function() {
   } else {
     console.log("Audio recording not supported in this browser.");
   }
+
+  getAllSpeakers();
 }
 
 function userMediaSuccess(e){
@@ -244,27 +250,69 @@ function learnReturn() {
 function predictReturn() {
   if (this.status == 200) {
     console.log("    Successfully gotten the prediction result");
-	var oldPredictions = document.getElementsByTagName("p");
-	for (i = 0; i < oldPredictions.length; i++) {
-	  document.body.removeChild(oldPredictions[i]);
-	}
-	
-    var p = document.createElement("p");
-    p.innerHTML = this.responseText;
-    document.body.appendChild(p);
-    //console.log(this.responseText);
+	displayPrediction(JSON.parse(this.responseText))
   } else {
     console.log("    Predict returns with error: " + this.status);
   }
 }
 
+function displayPrediction(speakerProbs) {
+	var predictionResponse = document.getElementById("prediction");
+
+	var max = Number.MIN_VALUE;
+	var maxSpeakerId = "NONE";
+	for (i = 0; i < speakerProbs.length; i++) {
+	  if (speakerProbs[i]['count'] > max) {
+		max = speakerProbs[i]['count'];
+		maxSpeakerId = speakerProbs[i]['id'];
+	  }
+	}
+
+	maxSpeaker = resolveSpeakerEntry(maxSpeakerId)
+    predictionResponse.innerHTML = maxSpeaker['name'];
+	var body = document.querySelector('body');
+	sweep(body, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
+	currentColor = maxSpeaker['color'];
+}
+
+function resolveSpeakerEntry(id) {
+	for (i = 0; i < speakerList.length; i++) {
+		if (id == speakerList[i]['id']) {
+			return speakerList[i];
+		}
+	}
+	return 'NONE'
+}
+
 function getAllSpeakers() {
   console.log("Getting all speakers..");
   var params = new FormData();
-  send("GET", "get_speakers", params, getSpeakersReturn);
+  send("GET", "get_speakers", params, updateSpeakersList);
 }
 
-function getSpeakersReturn() {
+function printAllSpeakers() {
+  console.log("Getting all speakers..");
+  var params = new FormData();
+  send("GET", "get_speakers", params, printSpeakersList);
+}
+
+function updateSpeakersList() {
+  if (this.status == 200) {
+    console.log("    Successfully gotten all the speakers");
+    // Handle this.responseText
+    var p = document.createElement("p");
+    /*p.innerHTML = this.responseText;
+    document.getElementById("list").appendChild(p);*/
+	speakerList = JSON.parse(this.responseText);
+	for (i = 0; i < speakerList.length; i++) {
+		speakerList[i]['color'] = speakerColors[i]
+	}
+  } else {
+    console.log("    Failed to get all speakers from server. Error: " + this.status);
+  }
+}
+
+function printSpeakersList() {
   if (this.status == 200) {
     console.log("    Successfully gotten all the speakers");
     // Handle this.responseText
