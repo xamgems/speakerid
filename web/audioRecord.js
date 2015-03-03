@@ -13,6 +13,9 @@ var counter = 0;
 var fileName = "sound";
 var predictionInterval;
 var recorder;
+var analyzer;
+var canvas;
+var draw_ctx;
 
 window.onload = function() {
   if (!navigator.getUserMedia)
@@ -25,8 +28,8 @@ window.onload = function() {
   recordButt = document.getElementById("record");
   stopButt = document.getElementById("stop");
 
-  sendButt = document.getElementById("send");
-  sendButt.onclick = sendWav;
+ // sendButt = document.getElementById("send");
+ // sendButt.onclick = sendWav;
 
   getSpeakers = document.getElementById("speaker");
   getSpeakers.onclick = getAllSpeakers;
@@ -55,19 +58,24 @@ function userMediaSuccess(e){
   var audioContext = window.AudioContext || window.webkitAudioContext;
   context = new audioContext();
 
-  mediaRecorder = new MediaRecorder(e);
+  //mediaRecorder = new MediaRecorder(e);
   recordButt.onclick = startRecord;
   stopButt.onclick = stopRecord;
-  mediaRecorder.ondataavailable = mediaDataReady;
+  //mediaRecorder.ondataavailable = mediaDataReady;
 
   volume = context.createGain();
 
   // creates an audio node from the microphone incoming stream
   audioInput = context.createMediaStreamSource(e);
   recorder = new Recorder(audioInput);
+  analyzer = context.createAnalyser();
+  
+  canvas = document.getElementById("wave_render");
+  draw_ctx = canvas.getContext("2d");
 
   // connect the stream to the gain node
   audioInput.connect(volume);
+  volume.connect(analyzer);
 
   /* This value controls how frequently the audioprocess event is 
      dispatched and how many sample-frames need to be processed each call. 
@@ -80,20 +88,41 @@ function userMediaSuccess(e){
   audioNode.onaudioprocess = function(e) {
     // FOR WHEN AUDIONODE RETURNS
     console.log("worker is working");
-    var left = e.inputBuffer.getChannelData (0);
-    var right = e.inputBuffer.getChannelData (1);
+    //var left = e.inputBuffer.getChannelData (0);
+    //var right = e.inputBuffer.getChannelData (1);
     // we clone the samples because deep copy else fuck things up
-    leftchannel.push (new Float32Array (left));
-    rightchannel.push (new Float32Array (right));
-    recordingLength += bufferSize;
+    //leftchannel.push (new Float32Array (left));
+    //rightchannel.push (new Float32Array (right));
+    //recordingLength += bufferSize;
     // SEND THIS TO FURTHER PROCESS?
     // OR SHOULD JUST DO IT HERE. TO REDUCE LATENCY
-    console.log(recordingLength);
+    //console.log(recordingLength);
   }
 
   // we connect the node
-  //volume.connect (audioNode);
-  //audioNode.connect (context.destination); 
+  analyzer.connect (audioNode);
+  audioNode.connect (context.destination); 
+  frameLooper();
+}
+
+function frameLooper() {
+  window.requestAnimationFrame(frameLooper);
+  console.log("drawing..");
+  fbc_arr = new Uint8Array(analyzer.frequencyBinCount);
+  analyzer.getByteFrequencyData(fbc_arr);
+  draw_ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (var i = 0; i < analyzer.frequencyBinCount; i++) {
+    var value = fbc_arr[i];
+    var percent = value / 256;
+    var height = canvas.height * percent;
+    var offset = canvas.height - height - 1;
+    var barWidth = canvas.width/analyzer.frequencyBinCount;
+    var hue = i/analyzer.frequencyBinCount * 360;
+    draw_ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+    draw_ctx.fillRect(i * barWidth, offset, barWidth, height);
+    draw_ctx.fillStyle = 'black';
+    draw_ctx.fillRect(i * barWidth, offset, 1, 1);
+  }
 }
 
 function startRecord() {
@@ -156,7 +185,7 @@ function exportPredictionData(s) {
 }
 
 function exportLearnData(s) {
-  var id = document.getElementById("newUser").value;
+  var id = document.getElementById("userId").value;
   var file = fileName + counter + ".wav";
   counter++;
   console.log(file);
@@ -165,13 +194,14 @@ function exportLearnData(s) {
   params.append("wav_sample", s);
   send("POST", "learn_speaker", params, learnReturn);
 }
-
+/*
 function sendWav() {
   // This method invokes the ondataavaible. which
   // is mediaDataReady
   mediaRecorder.requestData();
 }
-
+*/
+/*
 function mediaDataReady(e) {
   console.log("data available..");
   toSend.push(e.data);
@@ -199,7 +229,7 @@ function mediaDataReady(e) {
   params.append("wav", file);
   send(params, predictReturn);
 }
-
+*/
 function learnReturn() {
   if (this.status == 200) {
     console.log("    Successfully learned from voice data");
