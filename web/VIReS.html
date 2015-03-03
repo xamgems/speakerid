@@ -4,31 +4,73 @@
         <script type="text/javascript" src="recorder.js"></script>
         <script type="text/javascript" src="recorderWorker.js"></script>
         <script type="text/javascript" src="audioRecord.js"></script>
-		<script type="text/javascript" src="sweep.min.js"></script>
-	
-		<link rel="stylesheet" type="text/css" href="VIReS_UI.css" />
-	</head>
+		    <script type="text/javascript" src="sweep.min.js"></script>
+        <script type="text/javascript" src="https://code.jquery.com/jquery-2.1.3.min.js"></script>
+        <!-- <script type="text/javascript" src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>	  -->
+
+	    <link rel="stylesheet" type="text/css" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" />
+		  <link rel="stylesheet" type="text/css" href="VIReS_UI.css" />
+  </head>
 	<body>
-		<audio controls></audio>
-    <button id="record">Record</button>
-    <button id="stop">Stop</button>
-    <button id="send">Predict</button>
-    <br />
-    <button id="speaker">Get Speakers</button>
-    <br />
-    <p>
-      New User Name:
-      <input type="text" id="newUser" name="new" />
-      <button id="new">Submit New Speaker</button>
-    </p>
-    <p>
-      <input type="text" id="userId" />
+  <div id="main_body">
+    <div id="header">
+      <h1>VIReS</h1>
+      <footer>Voice Identification and Recognition System</footer>
+      <ul id="main_tabs">
+        <li class="active">Home</li>
+        <li>Team</li>
+        <li>GitHub</li>
+      </ul>
+    </div>
+    <hr />
+    <div id="main_frame">
+      <canvas id="wave_render"></canvas>
+	    <div id="name_wrapper">
+        <div id="prediction">
+          <span id="currSpeak" >Zachary </span>
+          <p>is speaking..</p>
+        </div>
+        <div id="speaker_list">
+          <p>People conversing..</p>
+          <ul>
+            <li>Jeremy</li>
+            <li>Sherman</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+		<!-- <audio controls></audio> -->
+    <div id="button_group" >
+      <button id="record">Start</button>
+      <button id="stop">Stop</button>
+    </div>
+    <!-- <button id="send">Predict</button> -->
+
+  <div id="bottom_frame">
+    <div id="new_frame">
+      <p>
+        New Speaker Name: </br>
+        <input type="text" id="newUser" name="new" /> </br>
+        <button id="new">Submit New Speaker</button>
+      </p>
+    </div>
+
+    <div id="learn_frame">
+      <p>
+        Speaker ID: </br>
+        <input type="text" id="userId" />
       <br />
-      <input type="checkbox" value="1" name="learn" id="learning"/>Learn
-    </p>    
-    <br />
-    <div id="list"></div>
-    <canvas id="wave_render"></canvas>
-	  <div id="prediction"></div>
+      <input type="checkbox" value="1" name="learn" id="learning"/> Learn
+      </p>
+      <button id="speaker">Get Speakers</button>
+      <table id="speaker_table" class="table">
+        <tr>
+          <th>Name</th>
+          <th>ID</th>
+        </tr>
+      </table>  
+    </div>
+  </div>     
+  </div>
   </body>
 </html>

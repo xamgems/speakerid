@@ -257,21 +257,21 @@ function predictReturn() {
 }
 
 function displayPrediction(speakerProbs) {
-	var predictionResponse = document.getElementById("prediction");
-
+	//var predictionResponse = document.getElementById("prediction");
+  var predictionResponse = document.getElementById("currSpeak");
 	var max = Number.MIN_VALUE;
 	var maxSpeakerId = "NONE";
 	for (i = 0; i < speakerProbs.length; i++) {
-	  if (speakerProbs[i]['count'] > max) {
-		max = speakerProbs[i]['count'];
-		maxSpeakerId = speakerProbs[i]['id'];
-	  }
+    if (speakerProbs[i]['count'] > max) {
+      max = speakerProbs[i]['count'];
+      maxSpeakerId = speakerProbs[i]['id'];
+    }
 	}
 
 	maxSpeaker = resolveSpeakerEntry(maxSpeakerId)
     predictionResponse.innerHTML = maxSpeaker['name'];
-	var body = document.querySelector('body');
-	sweep(body, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
+	//var body = document.querySelector('body');
+	sweep(predictionResponse, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
 	currentColor = maxSpeaker['color'];
 }
 
@@ -300,13 +300,33 @@ function updateSpeakersList() {
   if (this.status == 200) {
     console.log("    Successfully gotten all the speakers");
     // Handle this.responseText
-    var p = document.createElement("p");
+    //var p = document.createElement("p");
     /*p.innerHTML = this.responseText;
     document.getElementById("list").appendChild(p);*/
-	speakerList = JSON.parse(this.responseText);
-	for (i = 0; i < speakerList.length; i++) {
-		speakerList[i]['color'] = speakerColors[i]
-	}
+	  speakerList = JSON.parse(this.responseText);
+
+    // clear table before repopulation
+    var table = document.getElementById("speaker_table");
+    table.innerHTML = "";
+    var title1 = document.createElement("th");
+    title1.innerHTML = "Name";
+    var title2 = document.createElement("th");
+    title2.innerHTML = "ID";
+    var header = document.createElement("tr");
+    header.appendChild(title1);
+    header.appendChild(title2);
+    table.appendChild(header);
+	  for (i = 0; i < speakerList.length; i++) {
+		  speakerList[i]['color'] = speakerColors[i]
+	    var row = document.createElement("tr");
+      var id = document.createElement("td");
+      var name = document.createElement("td");
+      id.innerHTML = speakerList.id;
+      name.innerHTML = speakerList.name;
+      row.appendChild(name);
+      row.appendChild(id);
+      table.appendChild(row);
+    }
   } else {
     console.log("    Failed to get all speakers from server. Error: " + this.status);
   }
@@ -352,6 +372,6 @@ function newSpeakerReturn() {
 function send(method, endpoint, params, callback) {
   var ajax = new XMLHttpRequest();
   ajax.onload = callback;
-  ajax.open(method, "http://localhost/" + endpoint, true);
+  ajax.open(method, "https://localhost/" + endpoint, true);
   ajax.send(params);
 }

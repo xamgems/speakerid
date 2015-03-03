@@ -1,6 +1,50 @@
 canvas {
-	width:850px;
-	height:650px;
+	width:100%;
+	height:150px;
+  margin: 20px;
+}
+
+body {
+  margin:0px;
+  background-color: #f9f9f9;
+}
+
+#main_body {
+  padding:15px;
+  width:70%;
+  margin-left:auto;
+  margin-right:auto;
+}
+
+#header {
+  overflow:hidden;
+  background-color:white;
+}
+
+#main_tabs, #main_tabs li {
+  float:right;
+  margin-bottom:0px;
+}
+
+#main_tabs li {
+  margin-left:20px;
+  margin-right:20px;
+  list-style-type:none;
+}
+
+#main_frame {
+  overflow:hidden;
+  background-color:white;
+  margin-bottom:50px;
+}
+
+#name_wrapper {
+  width:100%;
+  float:left;
+}
+
+#name_wrapper > div {
+  vertical-align:top;
 }
 
 #file {
@@ -11,7 +55,72 @@ canvas {
 }
 
 #prediction {
+  display:inline-block;
+  width:48%;
+  text-align:center;
+  font-size:48pt;
+}
+
+#prediction p {
+  font-size:12pt;
+}
+
+#speaker_list, #speaker_list p{
+  width:48%;
+  text-align:center;
+  display:inline-block;
+}
+
+#speaker_list li {
+  list-style-type:none;
+}
+
+#button_group {
+  margin-bottom:50px;
+  text-align:center;
+}
+
+#button_group button {
+  padding: 10px 16px;
+  font-size:18pt;
+  margin:0px 10%;
+}
+
+#bottom_frame {
+  padding:15px;
+  background-color:white;
+}
+
+#bottom_frame > div {
+  display:inline-block;
+  width:48%;
+  text-align:center;
+  vertical-align:top;
+}
+
+#bottom_frame button {
+  padding: 5px 8px;
+  font-size:14pt;
+  margin:20px 0px;
+}
+
+th {
+  text-align:center;
+}
+/*
+#speakers_table {
+  width:100%;
+  max-width:100%;
+  margin-bottom:20px;
+  border-spacing:0;
+  border-collapse:collapse;
+  background-color:transparent;
+  border-color:gray;
+}
+
+#prediction {
 	 color: #ffffff;
 	 font-size: xx-large;
 	 text-align: center;
 }
+*/
