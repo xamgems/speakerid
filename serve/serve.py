@@ -56,7 +56,7 @@ def predict_speaker():
     models = list(map(lambda x: pickle.loads(x), models_binary))
 
     probs = predict.speaker_distribution('record.wav', user_ids, models)
-    return str(probs)
+    return json.dumps(probs)
 
 @app.route('/learn_speaker', methods=['POST'])
 @crossdomain(origin='*')

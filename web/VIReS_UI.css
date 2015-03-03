@@ -9,3 +9,9 @@ canvas {
 	right:5px;
 
 }
+
+#prediction {
+	 color: #ffffff;
+	 font-size: xx-large;
+	 text-align: center;
+}

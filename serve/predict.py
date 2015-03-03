@@ -40,7 +40,7 @@ def speaker_distribution(wav_filename, speakers, models):
         max_probs = max(enumerate(probs), key=lambda x: x[1])
         counts[max_probs[0]] += 1
 
-    probs = [(speaker.decode('utf-8'), c/sum(counts)) for (speaker, c) in zip(speakers, counts)]
+    probs = [{'id':speaker.decode('utf-8'), 'count':c/sum(counts)} for (speaker, c) in zip(speakers, counts)]
     return probs
 
 def likelihood(x, model):
