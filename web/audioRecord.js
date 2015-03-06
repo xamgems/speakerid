@@ -13,8 +13,9 @@ var counter = 0;
 var fileName = "sound";
 var recorder;
 var analyzer;
+var analyzerAfter;
 var canvas;
-var draw_ctx;
+var canvasAfter;
 
 var predictionInterval;
 var speakerList;
@@ -78,8 +79,10 @@ function userMediaSuccess(e){
   analyzer.smoothingTimeConstant = 0.3;
   analyzer.fftSize = 512;
  
-  canvas = document.getElementById("wave_render");
-  draw_ctx = canvas.getContext("2d");
+  analyzerAfter = context.createAnalyser();
+  analyzerAfter.smoothingTimeConstant = 0.3;
+  analyzerAfter.fftSize = 512;
+  
 
   // connect the stream to the gain node
   audioInput.connect(volume);
@@ -89,13 +92,28 @@ function userMediaSuccess(e){
      dispatched and how many sample-frames need to be processed each call. 
      Lower values for buffer size will result in a lower (better) latency. 
      Higher values will be necessary to avoid audio breakup and glitches */
-  var bufferSize = 2048;
-  var audioNode = context.createScriptProcessor(bufferSize, 2, 1);
+  var bufferSize = 4096;
+  var audioNode = context.createScriptProcessor(bufferSize, 1, 1);
 
 
-  audioNode.onaudioprocess = function(e) {
-    // FOR WHEN AUDIONODE RETURNS
-    console.log("worker is working");
+  audioNode.onaudioprocess = audioProcess;
+
+  // we connect the node
+  analyzer.connect (audioNode);
+  audioNode.connect (analyzerAfter);
+  analyzerAfter.connect (context.destination); 
+  startFrameLoop();  
+}
+
+function audioProcess(e) {
+    var inputBuffer = e.inputBuffer;
+    var outputBuffer = e.outputBuffer;
+
+    var inData = inputBuffer.getChannelData(0);
+    var outData = outputBuffer.getChannelData(0);
+    for (var i = 0; i < inputBuffer.length; i++) {
+      outData[i] = 2 * inData[i];
+    }
     //var left = e.inputBuffer.getChannelData (0);
     //var right = e.inputBuffer.getChannelData (1);
     // we clone the samples because deep copy else fuck things up
@@ -105,19 +123,21 @@ function userMediaSuccess(e){
     // SEND THIS TO FURTHER PROCESS?
     // OR SHOULD JUST DO IT HERE. TO REDUCE LATENCY
     //console.log(recordingLength);
-  }
+}
 
-  // we connect the node
-  analyzer.connect (audioNode);
-  audioNode.connect (context.destination); 
+function startFrameLoop() {
+  window.requestAnimationFrame(startFrameLoop);
   frameLooper();
+  frameLooperAfter();
 }
 
 function frameLooper() {
-  window.requestAnimationFrame(frameLooper);
   console.log("drawing..");
-  fbc_arr = new Uint8Array(analyzer.frequencyBinCount);
+  var fbc_arr = new Uint8Array(analyzer.frequencyBinCount);
   analyzer.getByteFrequencyData(fbc_arr);
+  
+  canvas = document.getElementById("wave_render");
+  var draw_ctx = canvas.getContext("2d");
   draw_ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   var gradient = draw_ctx.createLinearGradient(0,0,0,canvas.height);
@@ -134,6 +154,37 @@ function frameLooper() {
     var offset = canvas.height - height - 1;
     var barWidth = canvas.width/analyzer.frequencyBinCount;
     var hue = i/analyzer.frequencyBinCount * 360;
+    //draw_ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
+    draw_ctx.fillStyle = gradient;
+    //draw_ctx.fillRect((i * barWidth) + 1, offset, barWidth, height);
+    draw_ctx.fillRect(i * 3, offset, barWidth, height);
+    draw_ctx.fillStyle = 'black';
+    draw_ctx.fillRect(i * 3, offset, 1, 1);
+  }
+}
+
+function frameLooperAfter() {
+  var fbc_arr = new Uint8Array(analyzerAfter.frequencyBinCount);
+  analyzerAfter.getByteFrequencyData(fbc_arr);
+  
+  canvasAfter = document.getElementById("after_render");
+  var draw_ctx = canvasAfter.getContext("2d");
+  draw_ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  var gradient = draw_ctx.createLinearGradient(0,0,0,canvas.height);
+  gradient.addColorStop(1, '#000000');
+  gradient.addColorStop(0.75, '#000000');
+  gradient.addColorStop(0.5, '#000088');
+  gradient.addColorStop(0.25, '#0000ff');
+  gradient.addColorStop(0, '#0000ff');
+  
+  for (var i = 0; i < analyzerAfter.frequencyBinCount; i++) {
+    var value = fbc_arr[i];
+    var percent = value / 512;
+    var height = canvas.height * percent;
+    var offset = canvas.height - height - 1;
+    var barWidth = canvas.width/analyzerAfter.frequencyBinCount;
+    var hue = i/analyzerAfter.frequencyBinCount * 360;
     //draw_ctx.fillStyle = 'hsl(' + hue + ', 100%, 50%)';
     draw_ctx.fillStyle = gradient;
     //draw_ctx.fillRect((i * barWidth) + 1, offset, barWidth, height);
