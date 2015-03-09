@@ -21,6 +21,7 @@ var predictionInterval;
 var speakerList;
 var speakerColors = ["#2196f3", "#f44336", "#e91e63"];
 var currentColor = "#ffffff";
+var BUFFER_SIZE = 2048;
 
 window.onload = function() {
   if (!navigator.getUserMedia)
@@ -64,6 +65,7 @@ function userMediaSuccess(e){
   // creates the audio context
   var audioContext = window.AudioContext || window.webkitAudioContext;
   context = new audioContext();
+  console.log(context.sampleRate);
 
   //mediaRecorder = new MediaRecorder(e);
   recordButt.onclick = startRecord;
@@ -77,11 +79,11 @@ function userMediaSuccess(e){
   recorder = new Recorder(audioInput);
   analyzer = context.createAnalyser();
   analyzer.smoothingTimeConstant = 0.3;
-  analyzer.fftSize = 512;
+  analyzer.fftSize = 2048;
  
   analyzerAfter = context.createAnalyser();
   analyzerAfter.smoothingTimeConstant = 0.3;
-  analyzerAfter.fftSize = 512;
+  analyzerAfter.fftSize = 2048;
   
 
   // connect the stream to the gain node
@@ -92,8 +94,7 @@ function userMediaSuccess(e){
      dispatched and how many sample-frames need to be processed each call. 
      Lower values for buffer size will result in a lower (better) latency. 
      Higher values will be necessary to avoid audio breakup and glitches */
-  var bufferSize = 4096;
-  var audioNode = context.createScriptProcessor(bufferSize, 1, 1);
+  var audioNode = context.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
 
   audioNode.onaudioprocess = audioProcess;
@@ -111,6 +112,12 @@ function audioProcess(e) {
 
     var inData = inputBuffer.getChannelData(0);
     var outData = outputBuffer.getChannelData(0);
+
+    var fft = new FFT(BUFFER_SIZE, 44100);
+    fft.forward(inData);
+    var spectrum = fft.spectrum;
+    console.log(spectrum);
+
     for (var i = 0; i < inputBuffer.length; i++) {
       outData[i] = 2 * inData[i];
     }
