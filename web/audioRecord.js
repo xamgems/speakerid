@@ -23,6 +23,10 @@ var speakerColors = ["#2196f3", "#f44336", "#e91e63"];
 var currentColor = "#ffffff";
 var BUFFER_SIZE = 2048;
 
+var recording = false;
+var recLength = 0;
+var recBuffers = [];
+
 window.onload = function() {
   if (!navigator.getUserMedia)
     navigator.getUserMedia = navigator.getUserMedia || navigator.webkitGetUserMedia ||
@@ -76,7 +80,7 @@ function userMediaSuccess(e){
 
   // creates an audio node from the microphone incoming stream
   audioInput = context.createMediaStreamSource(e);
-  recorder = new Recorder(audioInput);
+ // recorder = new Recorder(audioInput);
   analyzer = context.createAnalyser();
   analyzer.smoothingTimeConstant = 0.3;
   analyzer.fftSize = 2048;
@@ -116,10 +120,15 @@ function audioProcess(e) {
     var fft = new FFT(BUFFER_SIZE, 44100);
     fft.forward(inData);
     var spectrum = fft.spectrum;
-    console.log(spectrum);
+    //console.log(spectrum);
 
     for (var i = 0; i < inputBuffer.length; i++) {
       outData[i] = 2 * inData[i];
+    }
+ 
+    if (recording) {   
+      recBuffers.push(inData);
+      recLength += inData.length;
     }
     //var left = e.inputBuffer.getChannelData (0);
     //var right = e.inputBuffer.getChannelData (1);
@@ -130,6 +139,56 @@ function audioProcess(e) {
     // SEND THIS TO FURTHER PROCESS?
     // OR SHOULD JUST DO IT HERE. TO REDUCE LATENCY
     //console.log(recordingLength);
+}
+
+function exportWAV(callback) {
+  var buffers = [];
+  for (var windows = 0; windows < recBuffers.length; windows++) {
+    buffers.push(mergeBuffers(recBuffers[windows], recLength));
+  }
+  var finalAudio = buffers[0];
+  var dataview = encodeWAV(finalAudio);
+  var audioBlob = new Blob([dataview], {type: type});
+  callback(audioBlob);
+  
+}
+
+function encodeWAV(samples) {
+  var buffer = new ArrayBuffer(44 + samples.length * 2);
+  var view = new DataView(buffer);
+
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(view, 8, 'WAVE');
+  writeString(view, 12, 'fmt');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, 44100, true);
+  view.setUint32(28, 44100 * 4, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  writeString(view, 36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  floatTo16BitPCM(view, 44, samples);
+  return view;
+}
+
+function floatTo16BitPCM(output, offset, input) {
+  for (var i = 0; i < input.length; i++, offset += 2) {
+    var s = Math.max(-1, Math.min(1, input[i]));
+    output.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  }
+}
+
+function mergeBuffers(recBuff, length) {
+  var result = new Float32Array(length);
+  var offset = 0;
+  for (var i = 0; i < recBuff.length; i++) {
+    result.set(recBuff[i], offset);
+    offset += recBuff[[i].length;
+  }
+  return result;
 }
 
 function startFrameLoop() {
@@ -202,6 +261,7 @@ function frameLooperAfter() {
 }
 
 function startRecord() {
+  
   if (document.getElementById("learning").checked) {
 	  startLearnRecord();
   } else {
@@ -218,15 +278,17 @@ function stopRecord() {
 }
 
 function startPredictRecord() {
-  recorder.record();
+  recording = true;
   console.log("recorder started");
 
   predictionInterval = window.setInterval(function () {
-	   recorder.stop();
-       recorder.exportWAV(exportPredictionData);
-       recorder.clear();
-	   recorder.record();
-	}, 500);
+	  // recorder.stop();
+	  recording = false;
+       //recorder.exportWAV(exportPredictionData);
+    exportWAV(exportPredictionData);      
+  // recorder.clear();
+	  recBuffers = [];
+  }, 500);
 }
 
 function stopPredictRecord() {
@@ -234,22 +296,24 @@ function stopPredictRecord() {
     window.clearInterval(predictionInterval);
 	delete predictionInterval;
   }
-  recorder.stop();
+  recording = false;
   console.log("recorder stopped");
-  recorder.exportWAV(exportPredictionData);
-  recorder.clear();
+  //recorder.exportWAV(exportPredictionData);
+  exportWAV(exportPredictionData);
+  recBuffers = [];
 }
 
 function startLearnRecord() {
-  recorder.record();
+  recording = true;
   console.log("recorder started");
 }
 
 function stopLearnRecord() {
-  recorder.stop();
+  recording = false;
   console.log("recorder stopped");
-  recorder.exportWAV(exportLearnData);
-  recorder.clear();
+  //recorder.exportWAV(exportLearnData);
+  exportWAV(exportLearnData);
+  recBuffers = [];
 }
 
 function exportPredictionData(s) {
@@ -270,42 +334,7 @@ function exportLearnData(s) {
   params.append("wav_sample", s);
   send("POST", "learn_speaker", params, learnReturn);
 }
-/*
-function sendWav() {
-  // This method invokes the ondataavaible. which
-  // is mediaDataReady
-  mediaRecorder.requestData();
-}
-*/
-/*
-function mediaDataReady(e) {
-  console.log("data available..");
-  toSend.push(e.data);
-  var blob = new Blob(toSend, { 'type' : 'audio/wav; codecs=opus'});
-  var audio = document.querySelector('audio');
-  var url = window.URL.createObjectURL(blob);
-  audio.src = url;
-  
-  var file = fileName + counter + ".wav";
-  console.log(file);  
-  counter++;
-  var link = document.createElement("a");
-  link.download = file;
-  console.log(url);
-  link.href = url;
 
-  var event = document.createEvent('Event');
-  event.initEvent('click', true, true);
-  link.dispatchEvent(event);
-  (window.URL || window.webkitURL).revokeObjectURL(link.href);
-
-  var params = new FormData();
-  params.append("request", "predict");
-  params.append("size", blob.size);
-  params.append("wav", file);
-  send(params, predictReturn);
-}
-*/
 function learnReturn() {
   if (this.status == 200) {
     console.log("    Successfully learned from voice data");
