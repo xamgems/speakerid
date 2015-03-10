@@ -48,6 +48,7 @@ def get_speakers():
 @app.route('/predict', methods=['POST'])
 @crossdomain(origin='*')
 def predict_speaker():
+    print(request.files)
     filename = next(tempfile._get_candidate_names())
     request.files['wav_sample'].save(filename)
 

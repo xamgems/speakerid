@@ -176,12 +176,6 @@ function audioProcess(e) {
         minEnergyAllFrames = Math.min(minEnergyAllFrames, frameEnergy);
       }
       var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
-
-
-      /*if (recording) {   
-        recBuffers.push(currFrame);
-        recLength += outData.length;
-      }*/
     }
 
 	for (var i = 0; i < inputBuffer.length; i++) {
@@ -192,16 +186,6 @@ function audioProcess(e) {
 		recBuffers.push(inData);
 		recLength += inData.length;		
 	}
-	
-    //var left = e.inputBuffer.getChannelData (0);
-    //var right = e.inputBuffer.getChannelData (1);
-    // we clone the samples because deep copy else fuck things up
-    //leftchannel.push (new Float32Array (left));
-    //rightchannel.push (new Float32Array (right));
-    //recordingLength += bufferSize;
-    // SEND THIS TO FURTHER PROCESS?
-    // OR SHOULD JUST DO IT HERE. TO REDUCE LATENCY
-    //console.log(recordingLength);
 }
 
 function geometricMean(spectrum) {
@@ -243,11 +227,7 @@ function exportWAV(callback) {
   var dataview = encodeWAV(finalAudio);
   var audioBlob = new Blob([dataview], {type: "audio/wav"});
   var audio = document.createElement("audio");
-	console.log(audioBlob);
-  audio.src = window.URL.createObjectURL(audioBlob);
-  document.body.appendChild(audio);
-  //callback(audioBlob);
-  
+  callback(audioBlob);
 }
 
 function encodeWAV(samples) {
@@ -257,7 +237,7 @@ function encodeWAV(samples) {
   writeString(view, 0, 'RIFF');
   view.setUint32(4, 36 + samples.length * 2, true);
   writeString(view, 8, 'WAVE');
-  writeString(view, 12, 'fmt');
+  writeString(view, 12, 'fmt ');
   view.setUint32(16, 16, true);
   view.setUint16(20, 1, true);
   view.setUint16(22, 1, true);
