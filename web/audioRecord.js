@@ -145,7 +145,6 @@ function audioProcess(e) {
       var arith_mean  = arithmeticMean(spectrum);
       var spec_flatness = geo_mean / arith_mean;
       var sfm = 10 * Math.log10(spec_flatness);
-      console.log(sfm);
       minSpecFlat = Math.min(minSpecFlat, sfm);
 
       var maxAmpFreq = Number.MIN_VALUE;
@@ -179,14 +178,21 @@ function audioProcess(e) {
       var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
 
 
-      if (recording) {   
+      /*if (recording) {   
         recBuffers.push(currFrame);
         recLength += outData.length;
-      }
+      }*/
     }
-    for (var i = 0; i < inputBuffer.length; i++) {
-      outData[i] = inData[i];
-    }
+
+	for (var i = 0; i < inputBuffer.length; i++) {
+		outData[i] = inData[i];
+	}
+	
+	if (recording) {
+		recBuffers.push(inData);
+		recLength += inData.length;		
+	}
+	
     //var left = e.inputBuffer.getChannelData (0);
     //var right = e.inputBuffer.getChannelData (1);
     // we clone the samples because deep copy else fuck things up
@@ -232,13 +238,15 @@ function arithmeticMean(spectrum) {
 
 function exportWAV(callback) {
   var buffers = [];
-  for (var windows = 0; windows < recBuffers.length; windows++) {
-    buffers.push(mergeBuffers(recBuffers[windows], recLength));
-  }
+  buffers.push(mergeBuffers(recBuffers, recLength));
   var finalAudio = buffers[0];
   var dataview = encodeWAV(finalAudio);
-  var audioBlob = new Blob([dataview], {type: type});
-  callback(audioBlob);
+  var audioBlob = new Blob([dataview], {type: "audio/wav"});
+  var audio = document.createElement("audio");
+	console.log(audioBlob);
+  audio.src = window.URL.createObjectURL(audioBlob);
+  document.body.appendChild(audio);
+  //callback(audioBlob);
   
 }
 
@@ -260,7 +268,15 @@ function encodeWAV(samples) {
   writeString(view, 36, 'data');
   view.setUint32(40, samples.length * 2, true);
   floatTo16BitPCM(view, 44, samples);
+
   return view;
+}
+
+
+function writeString(view, offset, string) {
+	for (var i = 0; i < string.length; i++) {
+		view.setUint8(offset + i, string.charCodeAt(i));
+	}
 }
 
 function floatTo16BitPCM(output, offset, input) {
@@ -274,7 +290,9 @@ function mergeBuffers(recBuff, length) {
   var result = new Float32Array(length);
   var offset = 0;
   for (var i = 0; i < recBuff.length; i++) {
-    result.set(recBuff[i], offset);
+	  for (var j = 0; j < recBuff[i].length; j++) {
+		  result[offset + j] = recBuff[i][j];
+	  }
     offset += recBuff[i].length;
   }
   return result;
@@ -371,11 +389,12 @@ function startPredictRecord() {
 
   predictionInterval = window.setInterval(function () {
 	  // recorder.stop();
-	  recording = false;
+	  //recording = false;
        //recorder.exportWAV(exportPredictionData);
     exportWAV(exportPredictionData);      
   // recorder.clear();
 	  recBuffers = [];
+	  recLength = 0;
   }, 500);
 }
 
@@ -389,6 +408,7 @@ function stopPredictRecord() {
   //recorder.exportWAV(exportPredictionData);
   exportWAV(exportPredictionData);
   recBuffers = [];
+  recLength = 0;
 }
 
 function startLearnRecord() {
@@ -402,7 +422,9 @@ function stopLearnRecord() {
   //recorder.exportWAV(exportLearnData);
   exportWAV(exportLearnData);
   recBuffers = [];
+  recLength = 0;
 }
+
 
 function exportPredictionData(s) {
   var file = fileName + counter + ".wav";
