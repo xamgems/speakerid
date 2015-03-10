@@ -24,6 +24,7 @@ var currentColor = "#ffffff";
 var BUFFER_SIZE = 16384;
 
 var recording = false;
+var silentCount = 0;
 var recLength = 0;
 var recBuffers = [];
 
@@ -37,9 +38,6 @@ window.onload = function() {
   console.log("User Media created");
   recordButt = document.getElementById("record");
   stopButt = document.getElementById("stop");
-
- // sendButt = document.getElementById("send");
- // sendButt.onclick = sendWav;
 
   getSpeakers = document.getElementById("speaker");
   getSpeakers.onclick = getAllSpeakers;
@@ -67,12 +65,9 @@ function userMediaSuccess(e){
   context = new audioContext();
   console.log(context.sampleRate);
 
-  //mediaRecorder = new MediaRecorder(e);
   recordButt.onclick = startRecord;
   stopButt.onclick = stopRecord;
-  //mediaRecorder.ondataavailable = mediaDataReady;
 
-  volume = context.createGain();
 
   // creates an audio node from the microphone incoming stream
   audioInput = context.createMediaStreamSource(e);
@@ -86,8 +81,7 @@ function userMediaSuccess(e){
   analyzerAfter.fftSize = 2048;
 
   // connect the stream to the gain node
-  audioInput.connect(volume);
-  volume.connect(analyzer);
+  audioInput.connect(analyzer);
 
   /* This value controls how frequently the audioprocess event is 
      dispatched and how many sample-frames need to be processed each call. 
@@ -165,18 +159,19 @@ function audioProcess(e) {
 
 			if (counter > 1) {
 				recBuffers.push(currFrame);
-				//recBuffers.push(inData);
-				recLength += currFrame.length;		
-			} else {
+        for (var i = 0; i < 512; i++) {
+          outData[i + j * 512] = inData[i + j * 512];
+        } 
+        recLength += currFrame.length;		
+      } else {
+        for (var i = 0; i < 512; i++) {
+          outData[i + j * 512] = 0;
+        } 
 				// Only update min energy if this frame is silent
 				minEnergyAllFrames = Math.min(minEnergyAllFrames, frameEnergy);
 			}
 			var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
 		}
-	}
-
-	for (var i = 0; i < inputBuffer.length; i++) {
-		outData[i] = inData[i];
 	}
 }
 
@@ -218,12 +213,12 @@ function exportWAV(callback) {
 		buffers.push(mergeBuffers(recBuffers, recLength));
 		var finalAudio = buffers[0];
 		var dataview = encodeWAV(finalAudio);
-		var audioBlob = new Blob([dataview], {type: "audio/wav"});
-		var audio = document.createElement("audio");
-		console.log(finalAudio.length)
-		
+		console.log("Sending audio file with length: " + finalAudio.length)
+		silentCount = 0;
 		callback(audioBlob);
-	}
+	} else {
+    silentCount++;
+  }
 }
 
 function encodeWAV(samples) {
@@ -364,11 +359,7 @@ function startPredictRecord() {
   console.log("recorder started");
 
   predictionInterval = window.setInterval(function () {
-	  // recorder.stop();
-	  //recording = false;
-       //recorder.exportWAV(exportPredictionData);
     exportWAV(exportPredictionData);      
-  // recorder.clear();
 	  recBuffers = [];
 	  recLength = 0;
   }, 1000);
@@ -377,11 +368,10 @@ function startPredictRecord() {
 function stopPredictRecord() {
   if (typeof predictionInterval !== 'undefined') {
     window.clearInterval(predictionInterval);
-	delete predictionInterval;
+    delete predictionInterval;
   }
   recording = false;
   console.log("recorder stopped");
-  //recorder.exportWAV(exportPredictionData);
   exportWAV(exportPredictionData);
   recBuffers = [];
   recLength = 0;
@@ -395,7 +385,6 @@ function startLearnRecord() {
 function stopLearnRecord() {
   recording = false;
   console.log("recorder stopped");
-  //recorder.exportWAV(exportLearnData);
   exportWAV(exportLearnData);
   recBuffers = [];
   recLength = 0;
@@ -442,10 +431,15 @@ function predictReturn() {
 }
 
 function displayPrediction(speakerProbs) {
-
 	var predictionBackground = document.getElementById("prediction");
-
   var predictionResponse = document.getElementById("currSpeak");
+  
+  if (speakerProbs == "NOBODY") {
+	  sweep(predictionBackground, 'backgroundColor', currentColor, '#FFFFFF', {duration: 500, space: 'RGB'});
+	  currentColor = '#FFFFFF';
+    predictionResponse.innerHTML = "Nobody";
+    return;
+  }  
 	var max = Number.MIN_VALUE;
 	var maxSpeakerId = "NONE";
 	for (i = 0; i < speakerProbs.length; i++) {
@@ -456,11 +450,10 @@ function displayPrediction(speakerProbs) {
     }
 	}
 
-	maxSpeaker = resolveSpeakerEntry(maxSpeakerId)
+  maxSpeaker = resolveSpeakerEntry(maxSpeakerId)
     predictionResponse.innerHTML = maxSpeaker['name'];
-	//var body = document.querySelector('body');
-	sweep(predictionBackground, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
-	currentColor = maxSpeaker['color'];
+  sweep(predictionBackground, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
+  currentColor = maxSpeaker['color'];
 }
 
 function resolveSpeakerEntry(id) {
@@ -481,10 +474,6 @@ function getAllSpeakers() {
 function updateSpeakersList() {
   if (this.status == 200) {
     console.log("    Successfully gotten all the speakers");
-    // Handle this.responseText
-    //var p = document.createElement("p");
-    /*p.innerHTML = this.responseText;
-    document.getElementById("list").appendChild(p);*/
 	  speakerList = JSON.parse(this.responseText);
 
     // clear table before repopulation
