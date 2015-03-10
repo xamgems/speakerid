@@ -95,7 +95,6 @@ function userMediaSuccess(e){
 
   audioNode.onaudioprocess = function(e) {
     // FOR WHEN AUDIONODE RETURNS
-    console.log("worker is working");
     //var left = e.inputBuffer.getChannelData (0);
     //var right = e.inputBuffer.getChannelData (1);
     // we clone the samples because deep copy else fuck things up
@@ -115,7 +114,6 @@ function userMediaSuccess(e){
 
 function frameLooper() {
   window.requestAnimationFrame(frameLooper);
-  console.log("drawing..");
   fbc_arr = new Uint8Array(analyzer.frequencyBinCount);
   analyzer.getByteFrequencyData(fbc_arr);
   draw_ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -269,7 +267,8 @@ function predictReturn() {
 }
 
 function displayPrediction(speakerProbs) {
-	//var predictionResponse = document.getElementById("prediction");
+	var predictionBackground = document.getElementById("prediction");
+
   var predictionResponse = document.getElementById("currSpeak");
 	var max = Number.MIN_VALUE;
 	var maxSpeakerId = "NONE";
@@ -283,7 +282,7 @@ function displayPrediction(speakerProbs) {
 	maxSpeaker = resolveSpeakerEntry(maxSpeakerId)
     predictionResponse.innerHTML = maxSpeaker['name'];
 	//var body = document.querySelector('body');
-	sweep(predictionResponse, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
+	sweep(predictionBackground, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
 	currentColor = maxSpeaker['color'];
 }
 
@@ -333,8 +332,8 @@ function updateSpeakersList() {
 	    var row = document.createElement("tr");
       var id = document.createElement("td");
       var name = document.createElement("td");
-      id.innerHTML = speakerList.id;
-      name.innerHTML = speakerList.name;
+      id.innerHTML = speakerList[i]['id'];
+      name.innerHTML = speakerList[i]['name'];
       row.appendChild(name);
       row.appendChild(id);
       table.appendChild(row);
@@ -384,6 +383,6 @@ function newSpeakerReturn() {
 function send(method, endpoint, params, callback) {
   var ajax = new XMLHttpRequest();
   ajax.onload = callback;
-  ajax.open(method, "https://localhost/" + endpoint, true);
+  ajax.open(method, "http://localhost/" + endpoint, true);
   ajax.send(params);
 }
