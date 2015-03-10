@@ -65,13 +65,15 @@ def predict_speaker():
 def learn_speaker():
     check_post_param('id')
     user_id = request.form['id']
-    request.files['wav_sample'].save('temp.wav')
+    filename = user_id + next(tempfile._get_candidate_names()) + '.wav'
+    request.files['wav_sample'].save(filename)
     user_training = None
     if redis.hexists(hm_data(user_id), USER_TRAINING):
         user_training = pickle.loads(redis.hget(hm_data(user_id), USER_TRAINING))
 
-    gmm, mfccs = predict.learn('temp.wav', user_training)
+    gmm, mfccs = predict.learn(filename, user_training)
     redis.hmset(hm_data(user_id), {USER_TRAINING: pickle.dumps(mfccs), USER_MODEL: pickle.dumps(gmm)})
+    os.remove(filename)
     return str(len(mfccs))
 
 def check_post_param(key):

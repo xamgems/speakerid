@@ -104,8 +104,11 @@ function audioProcess(e) {
 
 	var inData = inputBuffer.getChannelData(0);
 	var outData = outputBuffer.getChannelData(0);
-	
-	if (recording) {
+
+	if (document.getElementById("learning").checked && recording) {
+		recBuffers.push(inData);
+		recLength += inData.length;
+	} else if (recording) {
 		var energyPrimThresh = 40;
 		var freqPrimThresh = 185;
 		var sfmPrimThresh = 5;
@@ -204,21 +207,26 @@ function arithmeticMean(spectrum) {
   temp_data = temp_data.reduce(function (a, b) {
                                       return a + b;
                                   });
-  return temp_data / spectrum.length;
+	return temp_data / spectrum.length;
 }
 
 function exportWAV(callback) {
+	console.log("rec length: " + recLength)	
 	if (recLength >= 3500){	
 		var buffers = [];
 		buffers.push(mergeBuffers(recBuffers, recLength));
 		var finalAudio = buffers[0];
 		var dataview = encodeWAV(finalAudio);
-		console.log("Sending audio file with length: " + finalAudio.length)
+		var audioBlob = new Blob([dataview], {type: "audio/wav"});
+
 		silentCount = 0;
 		callback(audioBlob);
 	} else {
-    silentCount++;
-  }
+		silentCount++;
+		if (silentCount > 2) {
+			displayPrediction("NOBODY");
+		}
+	}
 }
 
 function encodeWAV(samples) {
