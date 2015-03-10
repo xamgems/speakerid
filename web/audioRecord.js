@@ -117,18 +117,75 @@ function audioProcess(e) {
     var inData = inputBuffer.getChannelData(0);
     var outData = outputBuffer.getChannelData(0);
 
-    var fft = new FFT(BUFFER_SIZE, 44100);
-    fft.forward(inData);
-    var spectrum = fft.spectrum;
-    //console.log(spectrum);
+    var energyPrimThresh = 8;
+    var freqPrimThresh = 1;
+    var sfmPrimThresh = -5;
 
-    for (var i = 0; i < inputBuffer.length; i++) {
-      outData[i] = 2 * inData[i];
+    var minEnergyAllFrames = Number.MAX_VALUE;
+    var minDomFreq = Number.MAX_VALUE;
+    var minSpecFlat = Number.MAX_VALUE;
+    for (var j = 0; j < BUFFER_SIZE/512; j++) {
+
+      var currFrame = [];
+      var frameEnergy = 0;
+      // To calculate the short term energy of this frame
+      for (var i = 0; i < 512; i++) {
+        currFrame.push(inData[i + j * 512]);
+        var sq = inData[i + j * 512] * inData[i + j * 512];
+        frameEnergy += sq;
+      } 
+
+      // apply fft
+      var fft = new FFT(512, 44100);
+      fft.forward(currFrame);
+      var spectrum = fft.spectrum;
+      
+      // Calculate the SFM
+      var geo_mean = geometricMean(spectrum);
+      var arith_mean  = arithmeticMean(spectrum);
+      var spec_flatness = geo_mean / arith_mean;
+      var sfm = 10 * Math.log10(spec_flatness);
+      console.log(sfm);
+      minSpecFlat = Math.min(minSpecFlat, sfm);
+
+      var maxAmpFreq = Number.MIN_VALUE;
+      var freqBand = 0;
+
+      // To get the dominant freq band
+      for (var i = 0; i < currFrame; i++) {
+        if (maxAmpFreq < currFrame[i]) {
+          maxAmpFreq = currFrame[i];
+          freqBand = i;
+        }
+      }
+      minDomFreq = Math.min(minDomFreq, maxAmpFreq);
+
+      // Decide on Thresholds
+      var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
+      var freqThresh = freqPrimThresh;
+      var sfmThresh = sfmPrimThresh;
+
+      var counter = 0;
+      if ((frameEnergy - minEnergyAllFrames) >= energyThresh) counter++;
+      if (maxAmpFreq - freqThresh >= freqThresh) counter++;
+      if (sfm - minSpecFlat >= sfmThresh) counter++;
+
+      if (counter > 1) {
+
+      } else {
+        // Only update min energy if this frame is silent
+        minEnergyAllFrames = Math.min(minEnergyAllFrames, frameEnergy);
+      }
+      var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
+
+
+      if (recording) {   
+        recBuffers.push(currFrame);
+        recLength += outData.length;
+      }
     }
- 
-    if (recording) {   
-      recBuffers.push(inData);
-      recLength += inData.length;
+    for (var i = 0; i < inputBuffer.length; i++) {
+      outData[i] = inData[i];
     }
     //var left = e.inputBuffer.getChannelData (0);
     //var right = e.inputBuffer.getChannelData (1);
@@ -139,6 +196,38 @@ function audioProcess(e) {
     // SEND THIS TO FURTHER PROCESS?
     // OR SHOULD JUST DO IT HERE. TO REDUCE LATENCY
     //console.log(recordingLength);
+}
+
+function geometricMean(spectrum) {
+  // converting to power spectrum
+  var temp_data = [];
+  for (var i = 0; i < spectrum.length; i++) {
+    //temp_data.push(spectrum[i] * spectrum[i]);
+    temp_data.push(spectrum[i]);
+  }
+  temp_data = temp_data.map(function (a) {
+                              return Math.log(a);
+                            });
+
+  temp_data = temp_data.reduce(function (a, b) {
+                                    return a + b;
+                                  });
+  temp_data = temp_data / spectrum.length;
+  return Math.exp(temp_data);
+}
+
+function arithmeticMean(spectrum) {
+  // Converting to power spectrum
+  var temp_data = [];
+  for (var i = 0; i < spectrum.length; i++) {
+    //temp_data.push(spectrum[i] * spectrum[i]);
+    temp_data.push(spectrum[i]);
+  }
+
+  temp_data = temp_data.reduce(function (a, b) {
+                                      return a + b;
+                                  });
+  return temp_data / spectrum.length;
 }
 
 function exportWAV(callback) {
@@ -186,7 +275,7 @@ function mergeBuffers(recBuff, length) {
   var offset = 0;
   for (var i = 0; i < recBuff.length; i++) {
     result.set(recBuff[i], offset);
-    offset += recBuff[[i].length;
+    offset += recBuff[i].length;
   }
   return result;
 }
@@ -198,7 +287,6 @@ function startFrameLoop() {
 }
 
 function frameLooper() {
-  console.log("drawing..");
   var fbc_arr = new Uint8Array(analyzer.frequencyBinCount);
   analyzer.getByteFrequencyData(fbc_arr);
   
