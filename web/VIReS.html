@@ -5,7 +5,8 @@
         <script type="text/javascript" src="recorderWorker.js"></script>
         <script type="text/javascript" src="audioRecord.js"></script>
 		    <script type="text/javascript" src="sweep.min.js"></script>
-        <!-- <script type="text/javascript" src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>	  -->
+        <script type="text/javascript" src="dsp.js"></script>
+        <script type="text/javascript" src="//cdnjs.cloudfare.com/ajax/libs/mathjs/1.4.0/math.min.js"></script>
 
 	    <link rel="stylesheet" type="text/css" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" />
 		  <link rel="stylesheet" type="text/css" href="VIReS_UI.css" />
@@ -24,9 +25,10 @@
     <hr />
     <div id="main_frame">
       <canvas id="wave_render"></canvas>
-	    <div id="name_wrapper">
+	    <canvas id="after_render"></canvas>
+      <div id="name_wrapper">
         <div id="prediction">
-          <span id="currSpeak" ></span>
+          <span id="currSpeak" >Nobody </span>
           <p>is speaking..</p>
         </div>
         <!--<div id="speaker_list">
