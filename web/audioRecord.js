@@ -21,7 +21,7 @@ var predictionInterval;
 var speakerList;
 var speakerColors = ["#2196f3", "#f44336", "#e91e63"];
 var currentColor = "#ffffff";
-var BUFFER_SIZE = 2048;
+var BUFFER_SIZE = 16384;
 
 var recording = false;
 var recLength = 0;
@@ -88,7 +88,6 @@ function userMediaSuccess(e){
   analyzerAfter = context.createAnalyser();
   analyzerAfter.smoothingTimeConstant = 0.3;
   analyzerAfter.fftSize = 2048;
-  
 
   // connect the stream to the gain node
   audioInput.connect(volume);
@@ -100,91 +99,88 @@ function userMediaSuccess(e){
      Higher values will be necessary to avoid audio breakup and glitches */
   var audioNode = context.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
-
   audioNode.onaudioprocess = audioProcess;
 
   // we connect the node
   analyzer.connect (audioNode);
   audioNode.connect (analyzerAfter);
-  analyzerAfter.connect (context.destination); 
+  //analyzerAfter.connect (context.destination); 
   startFrameLoop();  
 }
 
 function audioProcess(e) {
-    var inputBuffer = e.inputBuffer;
-    var outputBuffer = e.outputBuffer;
+	var inputBuffer = e.inputBuffer;
+	var outputBuffer = e.outputBuffer;
 
-    var inData = inputBuffer.getChannelData(0);
-    var outData = outputBuffer.getChannelData(0);
+	var inData = inputBuffer.getChannelData(0);
+	var outData = outputBuffer.getChannelData(0);
+	
+	if (recording) {
+		var energyPrimThresh = 40;
+		var freqPrimThresh = 185;
+		var sfmPrimThresh = 5;
 
-    var energyPrimThresh = 8;
-    var freqPrimThresh = 1;
-    var sfmPrimThresh = -5;
+		var minEnergyAllFrames = Number.MAX_VALUE;
+		var minDomFreq = Number.MAX_VALUE;
+		var minSpecFlat = Number.MAX_VALUE;
+		for (var j = 0; j < BUFFER_SIZE/512; j++) {
+			var currFrame = [];
+			var frameEnergy = 0;
+			// To calculate the short term energy of this frame
+			for (var i = 0; i < 512; i++) {
+				currFrame.push(inData[i + j * 512]);
+				var sq = inData[i + j * 512] * inData[i + j * 512];
+				frameEnergy += sq;
+			} 
 
-    var minEnergyAllFrames = Number.MAX_VALUE;
-    var minDomFreq = Number.MAX_VALUE;
-    var minSpecFlat = Number.MAX_VALUE;
-    for (var j = 0; j < BUFFER_SIZE/512; j++) {
+			// apply fft
+			var fft = new FFT(512, 44100);
+			fft.forward(currFrame);
+			var spectrum = fft.spectrum;
+			
+			// Calculate the SFM
+			var geo_mean = geometricMean(spectrum);
+			var arith_mean  = arithmeticMean(spectrum);
+			var spec_flatness = geo_mean / arith_mean;
+			var sfm = 10 * Math.log10(spec_flatness);
+			minSpecFlat = Math.min(minSpecFlat, sfm);
 
-      var currFrame = [];
-      var frameEnergy = 0;
-      // To calculate the short term energy of this frame
-      for (var i = 0; i < 512; i++) {
-        currFrame.push(inData[i + j * 512]);
-        var sq = inData[i + j * 512] * inData[i + j * 512];
-        frameEnergy += sq;
-      } 
+			var maxAmpFreq = Number.MIN_VALUE;
+			var freqBand = 0;
 
-      // apply fft
-      var fft = new FFT(512, 44100);
-      fft.forward(currFrame);
-      var spectrum = fft.spectrum;
-      
-      // Calculate the SFM
-      var geo_mean = geometricMean(spectrum);
-      var arith_mean  = arithmeticMean(spectrum);
-      var spec_flatness = geo_mean / arith_mean;
-      var sfm = 10 * Math.log10(spec_flatness);
-      minSpecFlat = Math.min(minSpecFlat, sfm);
+			// To get the dominant freq band
+			for (var i = 0; i < currFrame; i++) {
+				if (maxAmpFreq < currFrame[i]) {
+					maxAmpFreq = currFrame[i];
+					freqBand = i;
+				}
+			}
+			minDomFreq = Math.min(minDomFreq, maxAmpFreq);
 
-      var maxAmpFreq = Number.MIN_VALUE;
-      var freqBand = 0;
+			// Decide on Thresholds
+			var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
+			var freqThresh = freqPrimThresh;
+			var sfmThresh = sfmPrimThresh;
 
-      // To get the dominant freq band
-      for (var i = 0; i < currFrame; i++) {
-        if (maxAmpFreq < currFrame[i]) {
-          maxAmpFreq = currFrame[i];
-          freqBand = i;
-        }
-      }
-      minDomFreq = Math.min(minDomFreq, maxAmpFreq);
+			var counter = 0;
+			if ((frameEnergy - minEnergyAllFrames) >= energyThresh) counter++;
+			if (maxAmpFreq - freqThresh >= freqThresh) counter++;
+			if (sfm - minSpecFlat >= sfmThresh) counter++;
 
-      // Decide on Thresholds
-      var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
-      var freqThresh = freqPrimThresh;
-      var sfmThresh = sfmPrimThresh;
-
-      var counter = 0;
-      if ((frameEnergy - minEnergyAllFrames) >= energyThresh) counter++;
-      if (maxAmpFreq - freqThresh >= freqThresh) counter++;
-      if (sfm - minSpecFlat >= sfmThresh) counter++;
-
-      if (counter > 1) {
-
-      } else {
-        // Only update min energy if this frame is silent
-        minEnergyAllFrames = Math.min(minEnergyAllFrames, frameEnergy);
-      }
-      var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
-    }
+			if (counter > 1) {
+				recBuffers.push(currFrame);
+				//recBuffers.push(inData);
+				recLength += currFrame.length;		
+			} else {
+				// Only update min energy if this frame is silent
+				minEnergyAllFrames = Math.min(minEnergyAllFrames, frameEnergy);
+			}
+			var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
+		}
+	}
 
 	for (var i = 0; i < inputBuffer.length; i++) {
 		outData[i] = inData[i];
-	}
-	
-	if (recording) {
-		recBuffers.push(inData);
-		recLength += inData.length;		
 	}
 }
 
@@ -221,13 +217,17 @@ function arithmeticMean(spectrum) {
 }
 
 function exportWAV(callback) {
-  var buffers = [];
-  buffers.push(mergeBuffers(recBuffers, recLength));
-  var finalAudio = buffers[0];
-  var dataview = encodeWAV(finalAudio);
-  var audioBlob = new Blob([dataview], {type: "audio/wav"});
-  var audio = document.createElement("audio");
-  callback(audioBlob);
+	if (recLength >= 3500){	
+		var buffers = [];
+		buffers.push(mergeBuffers(recBuffers, recLength));
+		var finalAudio = buffers[0];
+		var dataview = encodeWAV(finalAudio);
+		var audioBlob = new Blob([dataview], {type: "audio/wav"});
+		var audio = document.createElement("audio");
+		console.log(finalAudio.length)
+		
+		callback(audioBlob);
+	}
 }
 
 function encodeWAV(samples) {
@@ -375,7 +375,7 @@ function startPredictRecord() {
   // recorder.clear();
 	  recBuffers = [];
 	  recLength = 0;
-  }, 500);
+  }, 1000);
 }
 
 function stopPredictRecord() {
@@ -446,12 +446,14 @@ function predictReturn() {
 }
 
 function displayPrediction(speakerProbs) {
+
 	var predictionBackground = document.getElementById("prediction");
 
   var predictionResponse = document.getElementById("currSpeak");
 	var max = Number.MIN_VALUE;
 	var maxSpeakerId = "NONE";
 	for (i = 0; i < speakerProbs.length; i++) {
+	console.log(speakerProbs[i]['id'] + ":" + speakerProbs[i]['count'])		
     if (speakerProbs[i]['count'] > max) {
       max = speakerProbs[i]['count'];
       maxSpeakerId = speakerProbs[i]['id'];
