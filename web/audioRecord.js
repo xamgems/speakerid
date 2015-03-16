@@ -7,7 +7,6 @@ var stopButt;
 var sendButt;
 var getSpeakers;
 var submitSpeaker;
-var mediaRecorder;
 var toSend = [];
 var counter = 0;
 var fileName = "sound";
@@ -19,6 +18,7 @@ var canvasAfter;
 
 var predictionInterval;
 var speakerList;
+var speakerPredictCount = new Object();
 var speakerColors = ["#2196f3", "#f44336", "#e91e63"];
 var currentColor = "#ffffff";
 var BUFFER_SIZE = 16384;
@@ -27,6 +27,10 @@ var recording = false;
 var silentCount = 0;
 var recLength = 0;
 var recBuffers = [];
+var speechCont;
+var speechBuffer = [];
+
+var speakerBuffer = ["NOBODY", "NOBODY", "NOBODY", "NOBODY", "NOBODY"];
 
 window.onload = function() {
   if (!navigator.getUserMedia)
@@ -37,7 +41,9 @@ window.onload = function() {
 
   console.log("User Media created");
   recordButt = document.getElementById("record");
+  recordButt.disabled = false;
   stopButt = document.getElementById("stop");
+  stopButt.disabled = true;
 
   getSpeakers = document.getElementById("speaker");
   getSpeakers.onclick = getAllSpeakers;
@@ -71,7 +77,6 @@ function userMediaSuccess(e){
 
   // creates an audio node from the microphone incoming stream
   audioInput = context.createMediaStreamSource(e);
- // recorder = new Recorder(audioInput);
   analyzer = context.createAnalyser();
   analyzer.smoothingTimeConstant = 0.3;
   analyzer.fftSize = 2048;
@@ -83,10 +88,6 @@ function userMediaSuccess(e){
   // connect the stream to the gain node
   audioInput.connect(analyzer);
 
-  /* This value controls how frequently the audioprocess event is 
-     dispatched and how many sample-frames need to be processed each call. 
-     Lower values for buffer size will result in a lower (better) latency. 
-     Higher values will be necessary to avoid audio breakup and glitches */
   var audioNode = context.createScriptProcessor(BUFFER_SIZE, 1, 1);
 
   audioNode.onaudioprocess = audioProcess;
@@ -99,90 +100,99 @@ function userMediaSuccess(e){
 }
 
 function audioProcess(e) {
-	var inputBuffer = e.inputBuffer;
-	var outputBuffer = e.outputBuffer;
+    var inputBuffer = e.inputBuffer;
+    var outputBuffer = e.outputBuffer;
 
-	var inData = inputBuffer.getChannelData(0);
-	var outData = outputBuffer.getChannelData(0);
+    var inData = inputBuffer.getChannelData(0);
+    var outData = outputBuffer.getChannelData(0);
 
-	if (document.getElementById("learning").checked && recording) {
-		recBuffers.push(inData);
-		recLength += inData.length;
-	} else if (recording) {
-		var energyPrimThresh = 40;
-		var freqPrimThresh = 185;
-		var sfmPrimThresh = 5;
+    if (document.getElementById("learning").checked && recording) {
+        recBuffers.push(inData);
+        recLength += inData.length;
+    } else if (recording) {
+        var energyPrimThresh = 40;
+        var freqPrimThresh = 185;
+        var sfmPrimThresh = 5;
 
-		var minEnergyAllFrames = Number.MAX_VALUE;
-		var minDomFreq = Number.MAX_VALUE;
-		var minSpecFlat = Number.MAX_VALUE;
-		for (var j = 0; j < BUFFER_SIZE/512; j++) {
-			var currFrame = [];
-			var frameEnergy = 0;
-			// To calculate the short term energy of this frame
-			for (var i = 0; i < 512; i++) {
-				currFrame.push(inData[i + j * 512]);
-				var sq = inData[i + j * 512] * inData[i + j * 512];
-				frameEnergy += sq;
-			} 
+        var minEnergyAllFrames = Number.MAX_VALUE;
+        var minDomFreq = Number.MAX_VALUE;
+        var minSpecFlat = Number.MAX_VALUE;
+        for (var j = 0; j < BUFFER_SIZE/512; j++) {
+            var currFrame = [];
+            var frameEnergy = 0;
+            // To calculate the short term energy of this frame
+            for (var i = 0; i < 512; i++) {
+                currFrame.push(inData[i + j * 512]);
+                var sq = inData[i + j * 512] * inData[i + j * 512];
+                frameEnergy += sq;
+            } 
 
-			// apply fft
-			var fft = new FFT(512, 44100);
-			fft.forward(currFrame);
-			var spectrum = fft.spectrum;
-			
-			// Calculate the SFM
-			var geo_mean = geometricMean(spectrum);
-			var arith_mean  = arithmeticMean(spectrum);
-			var spec_flatness = geo_mean / arith_mean;
-			var sfm = 10 * Math.log10(spec_flatness);
-			minSpecFlat = Math.min(minSpecFlat, sfm);
+            // apply fft
+            var fft = new FFT(512, 44100);
+            fft.forward(currFrame);
+            var spectrum = fft.spectrum;
 
-			var maxAmpFreq = Number.MIN_VALUE;
-			var freqBand = 0;
+            // Calculate the SFM
+            var geo_mean = geometricMean(spectrum);
+            var arith_mean  = arithmeticMean(spectrum);
+            var spec_flatness = geo_mean / arith_mean;
+            var sfm = 10 * Math.log10(spec_flatness);
+            minSpecFlat = Math.min(minSpecFlat, sfm);
 
-			// To get the dominant freq band
-			for (var i = 0; i < currFrame; i++) {
-				if (maxAmpFreq < currFrame[i]) {
-					maxAmpFreq = currFrame[i];
-					freqBand = i;
-				}
-			}
-			minDomFreq = Math.min(minDomFreq, maxAmpFreq);
+            var maxAmpFreq = Number.MIN_VALUE;
+            var freqBand = 0;
 
-			// Decide on Thresholds
-			var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
-			var freqThresh = freqPrimThresh;
-			var sfmThresh = sfmPrimThresh;
+            // To get the dominant freq band
+            for (var i = 0; i < currFrame; i++) {
+                if (maxAmpFreq < currFrame[i]) {
+                    maxAmpFreq = currFrame[i];
+                    freqBand = i;
+                }
+            }
+            minDomFreq = Math.min(minDomFreq, maxAmpFreq);
 
-			var counter = 0;
-			if ((frameEnergy - minEnergyAllFrames) >= energyThresh) counter++;
-			if (maxAmpFreq - freqThresh >= freqThresh) counter++;
-			if (sfm - minSpecFlat >= sfmThresh) counter++;
+            // Decide on Thresholds
+            var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
+            var freqThresh = freqPrimThresh;
+            var sfmThresh = sfmPrimThresh;
 
-			if (counter > 1) {
-				recBuffers.push(currFrame);
-        for (var i = 0; i < 512; i++) {
-          outData[i + j * 512] = inData[i + j * 512];
-        } 
-        recLength += currFrame.length;		
-      } else {
-        for (var i = 0; i < 512; i++) {
-          outData[i + j * 512] = 0;
-        } 
-				// Only update min energy if this frame is silent
-				minEnergyAllFrames = Math.min(minEnergyAllFrames, frameEnergy);
-			}
-			var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
-		}
-	}
+            var counter = 0;
+            if ((frameEnergy - minEnergyAllFrames) >= energyThresh) counter++;
+            if (maxAmpFreq - freqThresh >= freqThresh) counter++;
+            if (sfm - minSpecFlat >= sfmThresh) counter++;
+
+            if (counter > 1) {
+                speechBuffer.push(currFrame);
+                speechCont++;
+                if (speechCont >= 5) {
+                    for (var i = 0; i < speechBuffer.length; i++) {
+                        recBuffers.push(speechBuffer[i]);
+                        recLength += speechBuffer[i].length;		
+                    }
+                    speechBuffer = [];
+                    speechCont = 0;
+                }
+                for (var i = 0; i < 512; i++) { 
+                    outData[i + j * 512] = inData[i + j * 512];
+                } 
+            } else {
+                for (var i = 0; i < 512; i++) {
+                    outData[i + j * 512] = 0;
+                } 
+                speechCont = 0;
+                speechBuffer = [];
+                // Only update min energy if this frame is silent
+                minEnergyAllFrames = Math.min(minEnergyAllFrames, frameEnergy);
+            }
+            var energyThresh = energyPrimThresh * Math.log10(minEnergyAllFrames);
+        }
+    }
 }
 
 function geometricMean(spectrum) {
   // converting to power spectrum
   var temp_data = [];
   for (var i = 0; i < spectrum.length; i++) {
-    //temp_data.push(spectrum[i] * spectrum[i]);
     temp_data.push(spectrum[i]);
   }
   temp_data = temp_data.map(function (a) {
@@ -200,7 +210,6 @@ function arithmeticMean(spectrum) {
   // Converting to power spectrum
   var temp_data = [];
   for (var i = 0; i < spectrum.length; i++) {
-    //temp_data.push(spectrum[i] * spectrum[i]);
     temp_data.push(spectrum[i]);
   }
 
@@ -223,10 +232,10 @@ function exportWAV(callback) {
 		callback(audioBlob);
 	} else {
 		silentCount++;
-		if (silentCount > 2) {
-			displayPrediction("NOBODY");
-		}
-	}
+        speakerBuffer.shift();
+        speakerBuffer.push("NOBODY");
+        displayPrediction();
+    }
 }
 
 function encodeWAV(samples) {
@@ -346,7 +355,8 @@ function frameLooperAfter() {
 }
 
 function startRecord() {
-  
+  recordButt.disabled = true;
+  stopButt.disabled = false;
   if (document.getElementById("learning").checked) {
 	  startLearnRecord();
   } else {
@@ -355,6 +365,8 @@ function startRecord() {
 }
 
 function stopRecord() {
+  recordButt.disabled = false;
+  stopButt.disabled = true;
   if (document.getElementById("learning").checked) {
     stopLearnRecord();
   } else {
@@ -364,6 +376,7 @@ function stopRecord() {
 
 function startPredictRecord() {
   recording = true;
+  displayPrediction("Starting..");
   console.log("recorder started");
 
   predictionInterval = window.setInterval(function () {
@@ -374,24 +387,28 @@ function startPredictRecord() {
 }
 
 function stopPredictRecord() {
+  displayPrediction("Stopped");
   if (typeof predictionInterval !== 'undefined') {
     window.clearInterval(predictionInterval);
     delete predictionInterval;
   }
   recording = false;
   console.log("recorder stopped");
-  exportWAV(exportPredictionData);
   recBuffers = [];
   recLength = 0;
 }
 
 function startLearnRecord() {
   recording = true;
+  var id = document.getElementById("userId").value;
+  var speaker = resolveSpeakerEntry(id);
+  displayPrediction("Learning.. (" + speaker["name"] + ")" );
   console.log("recorder started");
 }
 
 function stopLearnRecord() {
   recording = false;
+  displayPrediction("Stopped");
   console.log("recorder stopped");
   exportWAV(exportLearnData);
   recBuffers = [];
@@ -400,8 +417,6 @@ function stopLearnRecord() {
 
 
 function exportPredictionData(s) {
-  var file = fileName + counter + ".wav";
-  counter++;
   var params = new FormData();
   params.append("wav_sample", s);
   send("POST", "predict", params, predictReturn);
@@ -409,9 +424,6 @@ function exportPredictionData(s) {
 
 function exportLearnData(s) {
   var id = document.getElementById("userId").value;
-  var file = fileName + counter + ".wav";
-  counter++;
-  console.log(file);
   var params = new FormData();
   params.append("id", id);
   params.append("wav_sample", s);
@@ -432,36 +444,59 @@ function learnReturn() {
 function predictReturn() {
   if (this.status == 200) {
     console.log("    Successfully gotten the prediction result");
-	displayPrediction(JSON.parse(this.responseText))
+	var speakerProbs = JSON.parse(this.responseText);
+    // remove first element.
+    speakerBuffer.shift();
+    speakerBuffer.push(speakerProbs);
+    displayPrediction();
   } else {
     console.log("    Predict returns with error: " + this.status);
   }
 }
 
-function displayPrediction(speakerProbs) {
-	var predictionBackground = document.getElementById("prediction");
-  var predictionResponse = document.getElementById("currSpeak");
-  
-  if (speakerProbs == "NOBODY") {
-	  sweep(predictionBackground, 'backgroundColor', currentColor, '#FFFFFF', {duration: 500, space: 'RGB'});
-	  currentColor = '#FFFFFF';
-    predictionResponse.innerHTML = "Nobody";
-    return;
-  }  
-	var max = Number.MIN_VALUE;
-	var maxSpeakerId = "NONE";
-	for (i = 0; i < speakerProbs.length; i++) {
-	console.log(speakerProbs[i]['id'] + ":" + speakerProbs[i]['count'])		
-    if (speakerProbs[i]['count'] > max) {
-      max = speakerProbs[i]['count'];
-      maxSpeakerId = speakerProbs[i]['id'];
-    }
-	}
+function displayPrediction(optString) {
+    optString = optString || "temp";
+    var predictionBackground = document.getElementById("prediction");
+    var predictionResponse = document.getElementById("currSpeak");
+    var smallText = document.getElementById("currSpeakSmall");
 
-  maxSpeaker = resolveSpeakerEntry(maxSpeakerId)
+    if (optString != "temp") {     
+        sweep(predictionBackground, 'backgroundColor', currentColor, '#FFFFFF', {duration: 500, space: 'RGB'});
+        currentColor = '#FFFFFF';
+        predictionResponse.innerHTML = optString;
+        smallText.innerHTML = "";
+        return;
+    } 
+    var max = Number.MIN_VALUE;
+    var maxSpeakerId = "NONE";
+    initializeSpeakerCount();
+    var noobCount = 0;
+    for (var j = 0; j < speakerBuffer.length; j++) {
+        speakerProbs = speakerBuffer[j];
+        if (speakerProbs != "NOBODY") {
+            for (var i = 0; i < speakerProbs.length; i++) {
+                speakerPredictCount[speakerProbs[i]['id']] += speakerProbs[i]['count'];
+                if (speakerPredictCount[speakerProbs[i]['id']] > max) {
+                    max = speakerPredictCount[speakerProbs[i]['id']];
+                    maxSpeakerId = speakerProbs[i]['id'];
+                }
+            }
+        } else {
+            noobCount++;
+        }
+    }
+    if (noobCount >= 3) {
+        sweep(predictionBackground, 'backgroundColor', currentColor, '#FFFFFF', {duration: 500, space: 'RGB'});
+        currentColor = '#FFFFFF';
+        predictionResponse.innerHTML = "Nobody";
+        smallText.innerHTML = "is speaking..";
+        return;
+    }
+    maxSpeaker = resolveSpeakerEntry(maxSpeakerId);
     predictionResponse.innerHTML = maxSpeaker['name'];
-  sweep(predictionBackground, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
-  currentColor = maxSpeaker['color'];
+    sweep(predictionBackground, 'backgroundColor', currentColor, maxSpeaker['color'], {duration: 500, space: 'RGB'});
+    currentColor = maxSpeaker['color'];
+    smallText.innerHTML = "is speaking..";
 }
 
 function resolveSpeakerEntry(id) {
@@ -495,19 +530,19 @@ function updateSpeakersList() {
     header.appendChild(title1);
     header.appendChild(title2);
     table.appendChild(header);
-	  for (i = 0; i < speakerList.length; i++) {
-		  speakerList[i]['color'] = speakerColors[i]
-	    var row = document.createElement("tr");
-      var id = document.createElement("td");
-      var name = document.createElement("td");
-      id.innerHTML = speakerList[i]['id'];
-      name.innerHTML = speakerList[i]['name'];
-      row.appendChild(name);
-      row.appendChild(id);
-      table.appendChild(row);
+    for (i = 0; i < speakerList.length; i++) {
+        speakerList[i]['color'] = speakerColors[i];
+        var row = document.createElement("tr");
+        var id = document.createElement("td");
+        var name = document.createElement("td");
+        id.innerHTML = speakerList[i]['id'];
+        name.innerHTML = speakerList[i]['name'];
+        row.appendChild(name);
+        row.appendChild(id);
+        table.appendChild(row);
     }
   } else {
-    console.log("    Failed to get all speakers from server. Error: " + this.status);
+      console.log("    Failed to get all speakers from server. Error: " + this.status);
   }
 }
 
@@ -541,4 +576,12 @@ function send(method, endpoint, params, callback) {
   ajax.onload = callback;
   ajax.open(method, "http://localhost/" + endpoint, true);
   ajax.send(params);
+}
+
+function initializeSpeakerCount() {
+    for (i = 0; i < speakerList.length; i++) {
+        speakerList[i]['color'] = speakerColors[i];
+        var id = speakerList[i]['id'];
+        speakerPredictCount[id] = 0;
+    }
 }
